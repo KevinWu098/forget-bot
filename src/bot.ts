@@ -3,10 +3,12 @@ import {
     Client,
     Events,
     GatewayIntentBits,
+    MessageFlags,
     type Interaction,
 } from "discord.js";
 
 import { handleCommand } from "@/lib/command-handler";
+import { tryCatch } from "@/lib/try-catch";
 
 const client = new Client({
     intents: [GatewayIntentBits.Guilds, GatewayIntentBits.DirectMessages],
@@ -22,33 +24,39 @@ client.on(Events.InteractionCreate, (interaction: Interaction) => {
             return;
         }
 
-        try {
-            const response = await handleCommand(interaction, {
+        const { data, error } = await tryCatch(
+            handleCommand(interaction, {
                 environment: "development",
-            });
+            })
+        );
 
-            await interaction.reply({
-                content: response.content,
-                ephemeral: response.ephemeral,
-            });
-        } catch (error) {
-            console.error(`❌ Error executing command:`, error);
-
+        if (error) {
             const errorMessage =
                 "There was an error while executing this command!";
+
+            console.error(`❌ Error executing command:`, error);
 
             if (interaction.replied || interaction.deferred) {
                 await interaction.followUp({
                     content: errorMessage,
-                    ephemeral: true,
+                    flags: MessageFlags.Ephemeral,
                 });
             } else {
                 await interaction.reply({
                     content: errorMessage,
-                    ephemeral: true,
+                    flags: MessageFlags.Ephemeral,
                 });
             }
+
+            return;
         }
+
+        await interaction.reply({
+            content: data.content,
+            flags: data.ephemeral ? MessageFlags.Ephemeral : undefined,
+        });
+
+        console.error(`❌ Error executing command:`, error);
     })();
 });
 
