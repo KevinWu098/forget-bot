@@ -55,14 +55,12 @@ client.on(Events.InteractionCreate, (interaction: Interaction) => {
             content: data.content,
             flags: data.ephemeral ? MessageFlags.Ephemeral : undefined,
         });
-
-        console.error(`❌ Error executing command:`, error);
     })();
 });
 
-const token = env.DISCORD_TOKEN;
+const token = env.DISCORD_TOKEN_DEV;
 if (!token) {
-    console.error("❌ DISCORD_TOKEN is not set in environment variables");
+    console.error("❌ DISCORD_TOKEN_DEV is not set in environment variables");
     process.exit(1);
 }
 

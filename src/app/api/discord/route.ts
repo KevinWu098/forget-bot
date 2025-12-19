@@ -2,7 +2,13 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { env } from "@/env";
 import { verifyKey } from "discord-interactions";
-import { InteractionResponseType, InteractionType } from "discord.js";
+import {
+    ApplicationCommandType,
+    InteractionResponseType,
+    InteractionType,
+    type CommandInteraction,
+} from "discord.js";
+import z from "zod";
 
 import { handleCommand } from "@/lib/command-handler";
 import { tryCatch } from "@/lib/try-catch";
@@ -30,16 +36,30 @@ export async function POST(request: NextRequest) {
         );
     }
 
-    const interaction = JSON.parse(body);
+    const interactionSchema = z.object({
+        type: z.enum(InteractionType),
+        data: z.object({
+            id: z.string(),
+            name: z.string(),
+            type: z.enum(ApplicationCommandType),
+        }),
+    });
+
+    const interaction = interactionSchema.parse(JSON.parse(body));
 
     switch (interaction.type) {
         case InteractionType.Ping:
             return NextResponse.json({
                 type: InteractionResponseType.Pong,
             });
-        case InteractionType.ApplicationCommand:
+        case InteractionType.ApplicationCommand: {
+            const commandInteraction = {
+                ...interaction.data,
+                commandName: interaction.data?.name,
+            } as unknown as CommandInteraction;
+
             const { data, error } = await tryCatch(
-                handleCommand(interaction, {
+                handleCommand(commandInteraction, {
                     environment:
                         env.NODE_ENV === "production"
                             ? "production"
@@ -65,6 +85,7 @@ export async function POST(request: NextRequest) {
                     flags: data.ephemeral ? 64 : undefined, // 64 = ephemeral flag
                 },
             });
+        }
         default:
             return NextResponse.json(
                 { error: "Unknown interaction type" },

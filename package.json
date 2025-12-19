@@ -6,8 +6,10 @@
         "dev": "pnpm bot:dev",
         "bot:dev": "tsx watch src/bot.ts",
         "build": "next build",
+        "prebuild": "pnpm deploy-commands:prod",
         "start": "next start",
-        "deploy-commands": "tsx src/deploy-commands.ts"
+        "deploy-commands": "tsx src/deploy-commands.ts",
+        "deploy-commands:prod": "NODE_ENV=production tsx src/deploy-commands.ts"
     },
     "dependencies": {
         "@t3-oss/env-nextjs": "^0.13.10",
