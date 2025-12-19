@@ -21,11 +21,17 @@
         "plugins": [
             {
                 "name": "workflow"
+            },
+            {
+                "name": "next"
             }
         ],
         "paths": {
             "@/*": ["./src/*"]
-        }
+        },
+        "lib": ["dom", "dom.iterable", "esnext"],
+        "incremental": true,
+        "jsx": "react-jsx"
     },
     "include": [
         "next-env.d.ts",

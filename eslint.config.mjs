@@ -50,7 +50,7 @@ const eslintConfig = defineConfig([
             "prefer-const": "warn",
             curly: ["warn", "all"],
             "@typescript-eslint/prefer-nullish-coalescing": "warn",
-            "no-console": ["warn", { allow: ["warn", "error"] }],
+            "no-console": ["warn", { allow: ["warn", "error", "info"] }],
             "@typescript-eslint/no-non-null-assertion": "warn",
             "@typescript-eslint/no-unnecessary-type-assertion": "warn",
         },

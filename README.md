@@ -1,40 +1,86 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/create-next-app).
+# Forget Bot
 
-## Getting Started
+A serverless Discord bot built with Next.js and Discord.js, deployable to
+Vercel.
 
-First, run the development server:
+## Features
+
+- ⚡ Serverless architecture using Discord Interactions Webhook
+- 🚀 Deployable to Vercel with zero configuration
+- 👤 User-installable (commands follow you, not servers)
+- 🔧 Easy to extend with new commands
+
+## Quick Start
+
+### 1. Install Dependencies
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. Set Up Environment Variables
 
-You can start editing the page by modifying `app/route.ts`. The page auto-updates as you edit the file.
+Create a `.env` file:
 
-## Learn More
+```bash
+DISCORD_TOKEN=your_bot_token_here
+DISCORD_APPLICATION_ID=your_application_id_here
+DISCORD_PUBLIC_KEY=your_public_key_here
+```
 
-To learn more about Next.js, take a look at the following resources:
+### 3. Deploy to Vercel
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+vercel
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### 4. Configure Discord
 
-## Deploy on Vercel
+1. Go to your
+   [Discord Developer Portal](https://discord.com/developers/applications)
+2. Set **Interactions Endpoint URL** to:
+   `https://your-app.vercel.app/api/discord`
+3. Enable **User Install** in the Installation tab
+4. Run `pnpm deploy-commands` to register slash commands
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### 5. Install to Your Account
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Visit: `https://discord.com/oauth2/authorize?client_id=YOUR_APPLICATION_ID`
 
-## API Routes
+## Available Commands
 
-This directory contains example API routes for the headless API app.
+- `/ping` - Replies with "Hello World"
 
-For more details, see [route.js file convention](https://nextjs.org/docs/app/api-reference/file-conventions/route).
+## Development
+
+### Local Gateway Bot (for testing)
+
+```bash
+pnpm bot:dev
+```
+
+### Local Serverless API
+
+```bash
+pnpm dev
+```
+
+Use [ngrok](https://ngrok.com/) to expose your local server for testing
+webhooks.
+
+## Adding New Commands
+
+1. Create a new file in `src/commands/utility/your-command.ts`
+2. Export `data` (SlashCommandBuilder) and `execute` function
+3. Import and register in `src/app/api/discord/route.ts`
+4. Run `pnpm deploy-commands` to register
+5. Deploy with `vercel --prod`
+
+See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed deployment instructions.
+
+## Tech Stack
+
+- [Next.js](https://nextjs.org) - React framework
+- [Discord.js](https://discord.js.org) - Discord API library
+- [Vercel](https://vercel.com) - Serverless hosting
+- TypeScript - Type safety
