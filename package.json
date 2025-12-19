@@ -3,10 +3,11 @@
     "version": "0.1.0",
     "private": true,
     "scripts": {
+        "predev": "pnpm deploy-commands",
         "dev": "pnpm bot:dev",
         "bot:dev": "tsx watch src/bot.ts",
-        "build": "next build",
         "prebuild": "pnpm deploy-commands:prod",
+        "build": "next build",
         "start": "next start",
         "deploy-commands": "tsx src/deploy-commands.ts",
         "deploy-commands:prod": "NODE_ENV=production tsx src/deploy-commands.ts"
