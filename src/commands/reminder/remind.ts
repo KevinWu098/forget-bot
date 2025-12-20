@@ -36,7 +36,7 @@ export const data = new SlashCommandBuilder()
         option
             .setName("ephemeral")
             .setDescription(
-                "Whether to send the reminder as an ephemeral message (only visible to you)"
+                "Whether to send the reminder as an ephemeral message (only visible to you). Defaults to true."
             )
             .setRequired(false)
     );
@@ -54,7 +54,7 @@ export async function execute(
     const sentAt = interaction.createdTimestamp;
     const time = interaction.options.getString("time");
     const message = interaction.options.getString("message");
-    const ephemeral = !!interaction.options.getBoolean("ephemeral");
+    const ephemeral = interaction.options.getBoolean("ephemeral") ?? true;
     const userId = interaction.user.id;
     const channelId = interaction.channelId;
 
@@ -76,8 +76,8 @@ export async function execute(
         ]);
 
         return {
-            content: `${context?.environment === "development" ? "[DEVELOPMENT] " : ""}✅ Reminder set! I'll remind you: "${message}"`,
-            ephemeral: true,
+            content: `✅ Reminder set! I'll remind you: "${message}"`,
+            ephemeral: ephemeral,
         };
     } catch (error) {
         console.error("Error setting reminder:", error);

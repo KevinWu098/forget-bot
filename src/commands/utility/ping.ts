@@ -20,9 +20,9 @@ export const data = new SlashCommandBuilder()
 
 export async function execute(
     _: CommandInteraction,
-    context?: ForgetBotContext
+    __: ForgetBotContext
 ): Promise<CommandResponse> {
     return {
-        content: `${context?.environment === "development" ? "[DEVELOPMENT] " : ""} Hello World`,
+        content: `Hello World`,
     };
 }

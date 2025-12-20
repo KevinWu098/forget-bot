@@ -6,9 +6,12 @@ if (!process.env.VERCEL) {
     config();
 }
 
+const NODE_ENV = z.enum(["development", "production"]);
+export type NodeEnv = z.infer<typeof NODE_ENV>;
+
 export const env = createEnv({
     server: {
-        NODE_ENV: z.enum(["development", "production"]).default("development"),
+        NODE_ENV: NODE_ENV.default("development"),
 
         DISCORD_TOKEN: z.string().min(1),
         DISCORD_APPLICATION_ID: z.string().min(1),

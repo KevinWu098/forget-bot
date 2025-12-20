@@ -11,7 +11,8 @@ export async function remindWorkflow(
 ) {
     "use workflow";
 
-    const durationMs = await calculateDuration(time, sentAt);
+    // Calculate duration inline to avoid step overhead
+    const durationMs = calculateDuration(time, sentAt);
 
     if (!durationMs) {
         throw new Error(
@@ -29,52 +30,19 @@ export async function remindWorkflow(
     };
 }
 
-async function calculateDuration(
-    time: string,
-    sentAt: number
-): Promise<number | null> {
-    "use step";
+function calculateDuration(time: string, _sentAt: number): number | null {
+    console.info(`Parsing time: "${time}"`);
 
-    const now = new Date(sentAt);
-
-    console.info(
-        `Parsing time: "${time}" with reference date: ${now.toISOString()}`
-    );
-
-    // First try simple duration parsing (e.g., "5 minutes", "30 seconds", "2 hours")
+    // Parse simple duration formats (e.g., "5 minutes", "30 seconds", "2 hours")
     const simpleDuration = parseSimpleDuration(time);
     if (simpleDuration) {
-        console.info(`Simple duration parsed: ${simpleDuration}ms`);
+        console.info(`Duration parsed: ${simpleDuration}ms`);
         return simpleDuration;
     }
 
-    // Fall back to chrono-node for more complex date/time parsing
-    const chrono = await import("chrono-node");
-    const parsedResults = chrono.parse(time, now);
-
-    console.info(`Chrono parsed ${parsedResults.length} results`);
-
-    if (parsedResults.length === 0) {
-        return null;
-    }
-
-    const parsedDate = parsedResults[0]?.start.date();
-
-    if (!parsedDate) {
-        return null;
-    }
-
-    const durationMs = parsedDate.getTime() - now.getTime();
-
-    console.info(
-        `Duration calculated: ${durationMs}ms (${durationMs / 1000 / 60} minutes)`
-    );
-
-    if (durationMs <= 0) {
-        return null;
-    }
-
-    return durationMs;
+    // TODO: Add support for complex date/time parsing with chrono-node
+    // For now, only simple durations are supported
+    return null;
 }
 
 function parseSimpleDuration(time: string): number | null {

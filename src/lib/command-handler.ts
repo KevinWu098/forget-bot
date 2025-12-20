@@ -1,9 +1,9 @@
 import { commands } from "@/commands";
+import type { NodeEnv } from "@/env";
 import type { CommandInteraction } from "discord.js";
 
 import { WHITELIST } from "@/lib/constants";
-
-import type { ForgetBotContext } from "./types";
+import type { ForgetBotContext } from "@/lib/types";
 
 export type CommandResponse = {
     content: string;
@@ -38,12 +38,12 @@ export async function handleCommand(
 
     const result = await command.execute(interaction, context);
 
-    // ? TODO: What is going on here?
-    if (typeof result === "string") {
-        return { content: result };
-    } else if (result && typeof result === "object" && "content" in result) {
-        return result;
-    } else {
-        return { content: "Command executed successfully" };
-    }
+    return {
+        content: withEnvironment(result.content, context.environment),
+        ephemeral: result.ephemeral,
+    };
+}
+
+function withEnvironment(content: string, environment: NodeEnv) {
+    return `${environment === "development" ? "[DEVELOPMENT] " : ""}${content}`;
 }
