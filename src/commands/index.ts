@@ -20,7 +20,7 @@ export const commands = new Map<
         data: SlashCommandOptionsOnlyBuilder;
         execute: (
             interaction: CommandInteraction,
-            context?: ForgetBotContext
+            context: ForgetBotContext
         ) => Promise<CommandResponse>;
     }
 >([

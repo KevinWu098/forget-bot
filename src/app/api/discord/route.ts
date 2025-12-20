@@ -116,10 +116,7 @@ export async function POST(request: NextRequest) {
 
             const { data, error } = await tryCatch(
                 handleCommand(commandInteraction, {
-                    environment:
-                        env.NODE_ENV === "production"
-                            ? "production"
-                            : "development",
+                    environment: env.NODE_ENV,
                 })
             );
 

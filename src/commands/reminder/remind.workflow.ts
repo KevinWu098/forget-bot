@@ -19,11 +19,8 @@ export async function remindWorkflow(
         );
     }
 
-    console.info("Sleeping for", durationMs, "ms");
     await sleep(durationMs);
-    console.info("Done sleeping, sending reminder now");
 
-    // Send the reminder message to the user
     await sendDiscordMessage(userId, message, channelId, environment);
 
     return {

@@ -1,6 +1,8 @@
 import { commands } from "@/commands";
 import type { CommandInteraction } from "discord.js";
 
+import { WHITELIST } from "@/lib/constants";
+
 import type { ForgetBotContext } from "./types";
 
 export type CommandResponse = {
@@ -10,8 +12,18 @@ export type CommandResponse = {
 
 export async function handleCommand(
     interaction: CommandInteraction,
-    context?: ForgetBotContext
+    context: ForgetBotContext
 ): Promise<CommandResponse> {
+    if (!WHITELIST.has(interaction.user.id)) {
+        return {
+            content: [
+                "🚫 **Access denied**",
+                "You don’t have permission to forget.",
+            ].join("\n"),
+            ephemeral: true,
+        };
+    }
+
     const commandName = interaction.commandName;
 
     if (!commandName) {

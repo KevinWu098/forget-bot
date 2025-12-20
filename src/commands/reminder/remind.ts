@@ -43,7 +43,7 @@ export const data = new SlashCommandBuilder()
 
 export async function execute(
     interaction: CommandInteraction,
-    context?: ForgetBotContext
+    context: ForgetBotContext
 ): Promise<CommandResponse> {
     if (!interaction.isChatInputCommand()) {
         return {
@@ -65,7 +65,6 @@ export async function execute(
     }
 
     try {
-        // Start the workflow
         await start(remindWorkflow, [
             sentAt,
             time,
@@ -73,7 +72,7 @@ export async function execute(
             ephemeral,
             userId,
             channelId,
-            context?.environment ?? "production",
+            context?.environment,
         ]);
 
         return {
