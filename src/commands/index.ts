@@ -1,5 +1,15 @@
-import { data, execute as pingExecute } from "@/commands/utility/ping";
-import type { CommandInteraction, SlashCommandBuilder } from "discord.js";
+import {
+    data as remindData,
+    execute as remindExecute,
+} from "@/commands/reminder/remind";
+import {
+    data as pingData,
+    execute as pingExecute,
+} from "@/commands/utility/ping";
+import type {
+    CommandInteraction,
+    SlashCommandOptionsOnlyBuilder,
+} from "discord.js";
 
 import type { CommandResponse } from "@/lib/command-handler";
 import type { ForgetBotContext } from "@/lib/types";
@@ -7,10 +17,13 @@ import type { ForgetBotContext } from "@/lib/types";
 export const commands = new Map<
     string,
     {
-        data: SlashCommandBuilder;
+        data: SlashCommandOptionsOnlyBuilder;
         execute: (
             interaction: CommandInteraction,
             context?: ForgetBotContext
         ) => Promise<CommandResponse>;
     }
->([[data.name, { data, execute: pingExecute }]]);
+>([
+    [pingData.name, { data: pingData, execute: pingExecute }],
+    [remindData.name, { data: remindData, execute: remindExecute }],
+]);

@@ -2,8 +2,7 @@ import { createEnv } from "@t3-oss/env-nextjs";
 import { config } from "dotenv";
 import { z } from "zod";
 
-// Load .env file for standalone scripts (bot, deploy-commands)
-if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
+if (!process.env.VERCEL) {
     config();
 }
 

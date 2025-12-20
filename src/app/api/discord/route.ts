@@ -38,11 +38,42 @@ export async function POST(request: NextRequest) {
 
     const interactionSchema = z.object({
         type: z.enum(InteractionType),
-        data: z.object({
-            id: z.string(),
-            name: z.string(),
-            type: z.enum(ApplicationCommandType),
-        }),
+        id: z.string(),
+        channel_id: z.string().optional(),
+        user: z
+            .object({
+                id: z.string(),
+                username: z.string(),
+            })
+            .optional(),
+        member: z
+            .object({
+                user: z.object({
+                    id: z.string(),
+                    username: z.string(),
+                }),
+            })
+            .optional(),
+        data: z
+            .object({
+                id: z.string(),
+                name: z.string(),
+                type: z.enum(ApplicationCommandType),
+                options: z
+                    .array(
+                        z.object({
+                            name: z.string(),
+                            type: z.number(),
+                            value: z.union([
+                                z.string(),
+                                z.number(),
+                                z.boolean(),
+                            ]),
+                        })
+                    )
+                    .optional(),
+            })
+            .optional(),
     });
 
     const interaction = interactionSchema.parse(JSON.parse(body));
@@ -54,8 +85,33 @@ export async function POST(request: NextRequest) {
             });
         case InteractionType.ApplicationCommand: {
             const commandInteraction = {
+                ...interaction,
                 ...interaction.data,
                 commandName: interaction.data?.name,
+                user: interaction.user ?? interaction.member?.user,
+                channelId: interaction.channel_id,
+                createdTimestamp: Date.now(),
+                isChatInputCommand: () => true,
+                options: {
+                    getString: (name: string) => {
+                        const option = interaction.data?.options?.find(
+                            (opt) => opt.name === name
+                        );
+                        if (option && typeof option.value === "string") {
+                            return option.value;
+                        }
+                        return null;
+                    },
+                    getBoolean: (name: string) => {
+                        const option = interaction.data?.options?.find(
+                            (opt) => opt.name === name
+                        );
+                        if (option && typeof option.value === "boolean") {
+                            return option.value;
+                        }
+                        return null;
+                    },
+                },
             } as unknown as CommandInteraction;
 
             const { data, error } = await tryCatch(
