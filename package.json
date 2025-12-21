@@ -14,7 +14,9 @@
     },
     "dependencies": {
         "@t3-oss/env-nextjs": "^0.13.10",
+        "@upstash/redis": "^1.35.8",
         "chrono-node": "^2.7.8",
+        "date-fns": "^4.1.0",
         "discord-interactions": "^4.2.0",
         "discord.js": "^14.25.1",
         "dotenv": "^16.4.7",

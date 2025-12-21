@@ -20,14 +20,28 @@ export const env = createEnv({
         DISCORD_TOKEN_DEV: z.string().min(1),
         DISCORD_APPLICATION_ID_DEV: z.string().min(1),
         DISCORD_PUBLIC_KEY_DEV: z.string().min(1),
+
+        KV_REST_API_READ_ONLY_TOKEN: z.string().min(1),
+        KV_REST_API_TOKEN: z.string().min(1),
+        KV_REST_API_URL: z.string().min(1),
+        KV_URL: z.string().min(1),
+        REDIS_URL: z.string().min(1),
     },
     runtimeEnv: {
         NODE_ENV: process.env.NODE_ENV,
+
         DISCORD_TOKEN: process.env.DISCORD_TOKEN,
         DISCORD_APPLICATION_ID: process.env.DISCORD_APPLICATION_ID,
         DISCORD_PUBLIC_KEY: process.env.DISCORD_PUBLIC_KEY,
+
         DISCORD_TOKEN_DEV: process.env.DISCORD_TOKEN_DEV,
         DISCORD_APPLICATION_ID_DEV: process.env.DISCORD_APPLICATION_ID_DEV,
         DISCORD_PUBLIC_KEY_DEV: process.env.DISCORD_PUBLIC_KEY_DEV,
+
+        KV_REST_API_READ_ONLY_TOKEN: process.env.KV_REST_API_READ_ONLY_TOKEN,
+        KV_REST_API_TOKEN: process.env.KV_REST_API_TOKEN,
+        KV_REST_API_URL: process.env.KV_REST_API_URL,
+        KV_URL: process.env.KV_URL,
+        REDIS_URL: process.env.REDIS_URL,
     },
 });

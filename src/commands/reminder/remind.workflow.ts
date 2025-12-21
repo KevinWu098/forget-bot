@@ -33,23 +33,13 @@ export async function remindWorkflow(
 function calculateDuration(time: string, _sentAt: number): number | null {
     console.info(`Parsing time: "${time}"`);
 
+    // NOTE: This parsing logic is duplicated from @/lib/parse-duration.ts
+    // because workflow functions must be self-contained and cannot dynamically
+    // import external modules. The logic is kept in sync manually.
+
     // Parse simple duration formats (e.g., "5 minutes", "30 seconds", "2 hours")
-    const simpleDuration = parseSimpleDuration(time);
-    if (simpleDuration) {
-        console.info(`Duration parsed: ${simpleDuration}ms`);
-        return simpleDuration;
-    }
-
-    // TODO: Add support for complex date/time parsing with chrono-node
-    // For now, only simple durations are supported
-    return null;
-}
-
-function parseSimpleDuration(time: string): number | null {
-    // Parse simple duration formats like "5 minutes", "30 seconds", "2 hours", etc.
     const normalized = time.toLowerCase().trim();
 
-    // Match patterns like "5 minutes", "5m", "5 mins", etc.
     const patterns = [
         { regex: /^(\d+\.?\d*)\s*(seconds?|secs?|s)$/i, multiplier: 1000 },
         {
@@ -75,11 +65,14 @@ function parseSimpleDuration(time: string): number | null {
         if (match && match[1]) {
             const amount = parseFloat(match[1]);
             if (!isNaN(amount) && amount > 0) {
+                console.info(`Duration parsed: ${amount * multiplier}ms`);
                 return amount * multiplier;
             }
         }
     }
 
+    // TODO: Add support for complex date/time parsing with chrono-node
+    // For now, only simple durations are supported
     return null;
 }
 
@@ -93,6 +86,7 @@ async function sendDiscordMessage(
 
     const { REST, Routes } = await import("discord.js");
     const { env } = await import("@/env");
+    const { redis } = await import("@/lib/redis");
 
     // Use the correct token based on environment
     const token =
@@ -103,14 +97,12 @@ async function sendDiscordMessage(
     const rest = new REST({ version: "10" }).setToken(token);
 
     try {
-        // Create a DM channel with the user
         const dmChannel = (await rest.post(Routes.userChannels(), {
             body: {
                 recipient_id: userId,
             },
         })) as { id: string };
 
-        // Send the reminder message to the DM channel
         await rest.post(Routes.channelMessages(dmChannel.id), {
             body: {
                 content: `⏰ **Reminder:** ${message}`,
@@ -120,6 +112,18 @@ async function sendDiscordMessage(
         console.info(
             `✅ [${environment.toUpperCase()}] Reminder sent to user ${userId}: ${message}`
         );
+
+        const reminderIds = await redis.smembers(`user:${userId}:reminders`);
+
+        for (const runId of reminderIds) {
+            const reminderData = await redis.hgetall(`reminder:${runId}`);
+
+            if (reminderData && reminderData.message === message) {
+                await redis.srem(`user:${userId}:reminders`, runId);
+                await redis.del(`reminder:${runId}`);
+                break;
+            }
+        }
     } catch (error) {
         console.error(`❌ Failed to send reminder to user ${userId}:`, error);
         throw error;

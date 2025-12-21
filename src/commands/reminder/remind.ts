@@ -1,3 +1,4 @@
+import { formatRelative } from "date-fns";
 import {
     ApplicationIntegrationType,
     InteractionContextType,
@@ -7,6 +8,8 @@ import {
 import { start } from "workflow/api";
 
 import type { CommandResponse } from "@/lib/command-handler";
+import { parseSimpleDuration } from "@/lib/parse-duration";
+import { redis } from "@/lib/redis";
 import type { ForgetBotContext } from "@/lib/types";
 
 import { remindWorkflow } from "./remind.workflow";
@@ -65,7 +68,12 @@ export async function execute(
     }
 
     try {
-        await start(remindWorkflow, [
+        // Pre-calculate duration for metadata
+        const durationMs = parseSimpleDuration(time) ?? 0;
+        const scheduledFor = sentAt + durationMs;
+
+        // Start workflow
+        const run = await start(remindWorkflow, [
             sentAt,
             time,
             message,
@@ -75,9 +83,24 @@ export async function execute(
             context?.environment,
         ]);
 
+        const runId = run.runId;
+        await redis.sadd(`user:${userId}:reminders`, runId);
+
+        await redis.hset(`reminder:${runId}`, {
+            message,
+            userId,
+            scheduledFor,
+            createdAt: sentAt,
+        });
+
+        // Set expiration for metadata (365 days)
+        await redis.expire(`reminder:${runId}`, 365 * 24 * 60 * 60);
+
+        const relativeTime = formatRelative(new Date(scheduledFor), new Date());
+
         return {
-            content: `✅ Reminder set! I'll remind you: "${message}"`,
-            ephemeral: ephemeral,
+            content: `✅ Reminder set! I'll remind you about "${message}" ${relativeTime}`,
+            ephemeral: true,
         };
     } catch (error) {
         console.error("Error setting reminder:", error);

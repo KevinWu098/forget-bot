@@ -1,4 +1,8 @@
 import {
+    data as listRemindersData,
+    execute as listRemindersExecute,
+} from "@/commands/reminder/list-reminders";
+import {
     data as remindData,
     execute as remindExecute,
 } from "@/commands/reminder/remind";
@@ -26,4 +30,8 @@ export const commands = new Map<
 >([
     [pingData.name, { data: pingData, execute: pingExecute }],
     [remindData.name, { data: remindData, execute: remindExecute }],
+    [
+        listRemindersData.name,
+        { data: listRemindersData, execute: listRemindersExecute },
+    ],
 ]);
