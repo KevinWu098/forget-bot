@@ -100,7 +100,7 @@ export async function execute(
 
         return {
             content: `✅ Reminder set! I'll remind you about "${message}" ${relativeTime}`,
-            ephemeral: true,
+            ephemeral,
         };
     } catch (error) {
         console.error("Error setting reminder:", error);
