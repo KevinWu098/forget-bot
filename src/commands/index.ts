@@ -1,19 +1,19 @@
 import {
     data as listRemindersData,
     execute as listRemindersExecute,
-} from "@/commands/reminder/list-reminders";
+} from "@/commands/list-reminders";
 import {
     data as remindData,
     execute as remindExecute,
-} from "@/commands/reminder/remind";
+} from "@/commands/create-reminder/slash-command";
 import {
     data as remindMessageData,
     execute as remindMessageExecute,
-} from "@/commands/reminder/remind-message";
+} from "@/commands/create-reminder/context-menu";
 import {
     data as remindModalData,
     execute as remindModalExecute,
-} from "@/commands/reminder/remind-modal";
+} from "@/commands/create-reminder/modal";
 import {
     data as pingData,
     execute as pingExecute,

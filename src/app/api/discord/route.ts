@@ -176,7 +176,8 @@ export async function POST(request: NextRequest) {
                             handleReminderCreation,
                             createMessageLink,
                             createMessagePreview,
-                        } = await import("@/commands/reminder/remind-message");
+                        } =
+                            await import("@/commands/create-reminder/context-menu");
 
                         const userId =
                             componentInteraction.user?.id ??
@@ -315,7 +316,7 @@ export async function POST(request: NextRequest) {
                 const ephemeral = fields.ephemeral === "true";
 
                 const { handleModalReminder } =
-                    await import("@/commands/reminder/remind-modal");
+                    await import("@/commands/create-reminder/modal");
 
                 const userId =
                     interaction.user?.id ?? interaction.member?.user?.id ?? "";

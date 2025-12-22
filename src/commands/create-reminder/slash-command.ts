@@ -10,7 +10,7 @@ import { redis } from "@/lib/redis";
 import { formatRelativeLA, parseSimpleDuration } from "@/lib/time-utils";
 import type { ApiCommandInteraction, ForgetBotContext } from "@/lib/types";
 
-import { remindWorkflow } from "./remind.workflow";
+import { remindWorkflow } from "./workflow";
 
 export const data = new SlashCommandBuilder()
     .setName("remind-me")
@@ -107,3 +107,4 @@ export async function execute(
         };
     }
 }
+

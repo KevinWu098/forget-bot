@@ -15,7 +15,7 @@ import { redis } from "@/lib/redis";
 import { formatRelativeLA, parseSimpleDuration } from "@/lib/time-utils";
 import type { ApiMessageContextInteraction } from "@/lib/types";
 
-import { remindWorkflow } from "./remind.workflow";
+import { remindWorkflow } from "./workflow";
 
 export const data = new ContextMenuCommandBuilder()
     .setName("Remind Me")
@@ -218,3 +218,4 @@ export function createMessagePreview(content: string, maxLength = 100): string {
 
     return trimmed.substring(0, maxLength) + "...";
 }
+
