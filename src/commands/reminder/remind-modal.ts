@@ -1,3 +1,4 @@
+import type { NodeEnv } from "@/env";
 import {
     ApplicationIntegrationType,
     InteractionContextType,
@@ -13,9 +14,8 @@ import {
 import { start } from "workflow/api";
 
 import type { CommandResponse } from "@/lib/command-handler";
-import { formatRelativeLA } from "@/lib/format-la-relative";
-import { parseSimpleDuration } from "@/lib/parse-duration";
 import { redis } from "@/lib/redis";
+import { formatRelativeLA, parseSimpleDuration } from "@/lib/time-utils";
 import type { ForgetBotContext } from "@/lib/types";
 
 import { remindWorkflow } from "./remind.workflow";
@@ -98,22 +98,11 @@ export async function handleModalReminder(params: {
     time: string;
     message: string;
     ephemeral: boolean;
-    publishToChannel: boolean;
     userId: string;
-    channelId?: string;
     sentAt: number;
-    environment: "development" | "production";
+    environment: NodeEnv;
 }): Promise<CommandResponse> {
-    const {
-        time,
-        message,
-        ephemeral,
-        publishToChannel,
-        userId,
-        channelId,
-        sentAt,
-        environment,
-    } = params;
+    const { time, message, ephemeral, userId, sentAt, environment } = params;
 
     if (!time || !message) {
         return {
@@ -123,7 +112,6 @@ export async function handleModalReminder(params: {
     }
 
     try {
-        // Pre-calculate duration for metadata
         const durationMs = parseSimpleDuration(time) ?? 0;
 
         if (durationMs === 0) {
@@ -133,18 +121,15 @@ export async function handleModalReminder(params: {
             };
         }
 
-        const scheduledFor = sentAt + durationMs;
+        const scheduledForMs = sentAt + durationMs;
 
-        // Start workflow
         const run = await start(remindWorkflow, [
-            sentAt,
-            time,
+            durationMs,
+            scheduledForMs,
             message,
             ephemeral,
             userId,
-            channelId,
             environment,
-            publishToChannel,
         ]);
 
         const runId = run.runId;
@@ -153,18 +138,18 @@ export async function handleModalReminder(params: {
         await redis.hset(`reminder:${runId}`, {
             message,
             userId,
-            scheduledFor,
+            scheduledFor: scheduledForMs,
             createdAt: sentAt,
         });
 
         // Set expiration for metadata (365 days)
         await redis.expire(`reminder:${runId}`, 365 * 24 * 60 * 60);
 
-        const relativeTime = formatRelativeLA(scheduledFor, sentAt);
+        const relativeTime = formatRelativeLA(scheduledForMs, sentAt);
 
         return {
             content: `✅ Reminder set! I'll remind you about "${message}" ${relativeTime}`,
-            ephemeral: publishToChannel ? false : ephemeral,
+            ephemeral,
         };
     } catch (error) {
         console.error("Error setting reminder:", error);

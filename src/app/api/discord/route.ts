@@ -237,9 +237,7 @@ export async function POST(request: NextRequest) {
                         time: time ?? "",
                         message: message ?? "",
                         ephemeral,
-                        publishToChannel,
                         userId,
-                        channelId: interaction.channel_id,
                         sentAt: Date.now(),
                         environment:
                             env.NODE_ENV === "production"

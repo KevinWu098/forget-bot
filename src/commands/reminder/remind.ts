@@ -7,9 +7,8 @@ import {
 import { start } from "workflow/api";
 
 import type { CommandResponse } from "@/lib/command-handler";
-import { formatRelativeLA } from "@/lib/format-la-relative";
-import { parseSimpleDuration } from "@/lib/parse-duration";
 import { redis } from "@/lib/redis";
+import { formatRelativeLA, parseSimpleDuration } from "@/lib/time-utils";
 import type { ForgetBotContext } from "@/lib/types";
 
 import { remindWorkflow } from "./remind.workflow";
@@ -62,7 +61,6 @@ export async function execute(
     const message = interaction.options.getString("message");
     const ephemeral = interaction.options.getBoolean("ephemeral") ?? true;
     const userId = interaction.user.id;
-    const channelId = interaction.channelId;
 
     if (!time || !message) {
         return {
@@ -71,20 +69,16 @@ export async function execute(
     }
 
     try {
-        // Pre-calculate duration for metadata
         const durationMs = parseSimpleDuration(time) ?? 0;
-        const scheduledFor = sentAt + durationMs;
+        const scheduledForMs = sentAt + durationMs;
 
-        // Start workflow
         const run = await start(remindWorkflow, [
-            sentAt,
-            time,
+            durationMs,
+            scheduledForMs,
             message,
             ephemeral,
             userId,
-            channelId,
             context?.environment,
-            false,
         ]);
 
         const runId = run.runId;
@@ -93,14 +87,14 @@ export async function execute(
         await redis.hset(`reminder:${runId}`, {
             message,
             userId,
-            scheduledFor,
+            scheduledForMs,
             createdAt: sentAt,
         });
 
         // Set expiration for metadata (365 days)
         await redis.expire(`reminder:${runId}`, 365 * 24 * 60 * 60);
 
-        const relativeTime = formatRelativeLA(scheduledFor, sentAt);
+        const relativeTime = formatRelativeLA(scheduledForMs, sentAt);
 
         return {
             content: `✅ Reminder set! I'll remind you about "${message}" ${relativeTime}`,
