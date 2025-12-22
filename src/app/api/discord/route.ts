@@ -4,7 +4,6 @@ import { env } from "@/env";
 import {
     ApplicationCommandOptionType,
     ApplicationCommandType,
-    ComponentType,
     InteractionResponseType,
     InteractionType,
     MessageFlags,
@@ -245,20 +244,42 @@ type OptionWithValue = APIApplicationCommandInteractionDataOption & {
 function collectModalFields(interaction: APIModalSubmitInteraction) {
     const fields: Record<string, string> = {};
 
-    const rows = interaction.data.components ?? [];
-
-    for (const row of rows) {
-        if (row.type !== ComponentType.ActionRow) {
-            continue;
+    const visit = (node: unknown) => {
+        if (!node) {
+            return;
         }
 
-        for (const component of row.components) {
-            const customId = component.custom_id;
-
-            const value = component.value;
-            fields[customId] = value;
+        if (Array.isArray(node)) {
+            for (const item of node) {
+                visit(item);
+            }
+            return;
         }
-    }
+
+        if (typeof node !== "object") {
+            return;
+        }
+
+        const obj = node as Record<string, unknown>;
+        const customId = obj.custom_id;
+
+        if (typeof customId === "string") {
+            if (typeof obj.value === "string") {
+                fields[customId] = obj.value;
+            } else if (Array.isArray(obj.values) && obj.values.length > 0) {
+                fields[customId] = String(obj.values[0]);
+            }
+        }
+
+        if ("components" in obj) {
+            visit(obj.components);
+        }
+        if ("component" in obj) {
+            visit(obj.component);
+        }
+    };
+
+    visit(interaction.data?.components);
 
     return fields;
 }
