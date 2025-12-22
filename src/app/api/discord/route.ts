@@ -4,6 +4,7 @@ import { env } from "@/env";
 import {
     ApplicationCommandOptionType,
     ApplicationCommandType,
+    ComponentType,
     InteractionResponseType,
     InteractionType,
     MessageFlags,
@@ -244,31 +245,18 @@ type OptionWithValue = APIApplicationCommandInteractionDataOption & {
 function collectModalFields(interaction: APIModalSubmitInteraction) {
     const fields: Record<string, string> = {};
 
-    const rows = (interaction.data.components ?? []) as Array<{
-        components?: Array<{
-            custom_id?: unknown;
-            value?: unknown;
-            values?: unknown;
-        }>;
-    }>;
+    const rows = interaction.data.components ?? [];
 
     for (const row of rows) {
-        for (const component of row.components ?? []) {
+        if (row.type !== ComponentType.ActionRow) {
+            continue;
+        }
+
+        for (const component of row.components) {
             const customId = component.custom_id;
 
-            if (typeof customId !== "string") {
-                continue;
-            }
-
-            if (typeof component.value === "string") {
-                fields[customId] = component.value;
-                continue;
-            }
-
-            const values = component.values;
-            if (Array.isArray(values) && values[0]) {
-                fields[customId] = String(values[0]);
-            }
+            const value = component.value;
+            fields[customId] = value;
         }
     }
 

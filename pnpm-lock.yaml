@@ -54,6 +54,9 @@ importers:
       '@types/react':
         specifier: ^19
         version: 19.2.7
+      discord-api-types:
+        specifier: ^0.38.37
+        version: 0.38.37
       eslint:
         specifier: ^9.39.2
         version: 9.39.2(jiti@2.6.1)

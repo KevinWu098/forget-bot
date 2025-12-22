@@ -30,6 +30,7 @@
         "@ianvs/prettier-plugin-sort-imports": "^4.7.0",
         "@types/node": "^20",
         "@types/react": "^19",
+        "discord-api-types": "^0.38.37",
         "eslint": "^9.39.2",
         "eslint-config-next": "^16.1.0",
         "prettier": "^3.7.4",
