@@ -1,4 +1,5 @@
 # Forget Bot
 
-A minimal bot for ~~reminders~~ forgetfulness on the ~~coordination~~ Discord
-platform. Built on Vercel and Vercel Workflows with Discord.js.
+A ~~minimal~~ mostly-minimal serverless bot for ~~reminders~~ forgetfulness on
+Discord. Built on Vercel Workflows, Vercel KV (Redis), and modern Discord.js
+(modals, interactions).
