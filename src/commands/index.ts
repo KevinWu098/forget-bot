@@ -14,20 +14,17 @@ import {
     data as pingData,
     execute as pingExecute,
 } from "@/commands/utility/ping";
-import type {
-    CommandInteraction,
-    SlashCommandOptionsOnlyBuilder,
-} from "discord.js";
+import type { SlashCommandOptionsOnlyBuilder } from "discord.js";
 
 import type { CommandResponse } from "@/lib/command-handler";
-import type { ForgetBotContext } from "@/lib/types";
+import type { ApiCommandInteraction, ForgetBotContext } from "@/lib/types";
 
 export const commands = new Map<
     string,
     {
         data: SlashCommandOptionsOnlyBuilder;
         execute: (
-            interaction: CommandInteraction,
+            interaction: ApiCommandInteraction,
             context: ForgetBotContext
         ) => Promise<CommandResponse>;
     }

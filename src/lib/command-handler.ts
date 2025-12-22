@@ -1,10 +1,10 @@
 import { commands } from "@/commands";
 import type { NodeEnv } from "@/env";
-import type { CommandInteraction, ModalBuilder } from "discord.js";
+import type { ModalBuilder } from "discord.js";
 
 import { WHITELIST } from "@/lib/constants";
 import { tryCatch } from "@/lib/try-catch";
-import type { ForgetBotContext } from "@/lib/types";
+import type { ApiCommandInteraction, ForgetBotContext } from "@/lib/types";
 
 export type CommandResponse = {
     content: string;
@@ -13,7 +13,7 @@ export type CommandResponse = {
 };
 
 export async function handleCommand(
-    interaction: CommandInteraction,
+    interaction: ApiCommandInteraction,
     context: ForgetBotContext
 ): Promise<CommandResponse> {
     if (!WHITELIST.has(interaction.user.id)) {

@@ -1,18 +1,22 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { env } from "@/env";
-import { verifyKey } from "discord-interactions";
 import {
+    ApplicationCommandOptionType,
     ApplicationCommandType,
     InteractionResponseType,
     InteractionType,
     MessageFlags,
-    type CommandInteraction,
-} from "discord.js";
-import z from "zod";
+    type APIApplicationCommandInteractionDataOption,
+    type APIChatInputApplicationCommandInteraction,
+    type APIInteraction,
+    type APIModalSubmitInteraction,
+} from "discord-api-types/v10";
+import { verifyKey } from "discord-interactions";
 
 import { handleCommand } from "@/lib/command-handler";
 import { tryCatch } from "@/lib/try-catch";
+import type { ApiCommandInteraction } from "@/lib/types";
 
 export async function POST(request: NextRequest) {
     const signature = request.headers.get("x-signature-ed25519");
@@ -37,51 +41,17 @@ export async function POST(request: NextRequest) {
         );
     }
 
-    const interactionSchema = z.object({
-        type: z.enum(InteractionType),
-        id: z.string(),
-        channel_id: z.string().optional(),
-        user: z
-            .object({
-                id: z.string(),
-                username: z.string(),
-            })
-            .optional(),
-        member: z
-            .object({
-                user: z.object({
-                    id: z.string(),
-                    username: z.string(),
-                }),
-            })
-            .optional(),
-        data: z
-            .object({
-                id: z.string().optional(),
-                name: z.string().optional(),
-                type: z.enum(ApplicationCommandType).optional(),
-                custom_id: z.string().optional(),
-                // Modal submit component payloads can vary by client/library version.
-                // Keep this permissive and do robust extraction below.
-                components: z.array(z.any()).optional(),
-                options: z
-                    .array(
-                        z.object({
-                            name: z.string(),
-                            type: z.number(),
-                            value: z.union([
-                                z.string(),
-                                z.number(),
-                                z.boolean(),
-                            ]),
-                        })
-                    )
-                    .optional(),
-            })
-            .optional(),
-    });
+    const { data: interaction, error } = await tryCatch(
+        Promise.try(() => JSON.parse(body) as APIInteraction)
+    );
 
-    const interaction = interactionSchema.parse(JSON.parse(body));
+    if (error) {
+        console.error("❌ Error parsing interaction payload:", error);
+        return NextResponse.json(
+            { error: "Invalid interaction payload" },
+            { status: 400 }
+        );
+    }
 
     switch (interaction.type) {
         case InteractionType.Ping:
@@ -89,35 +59,14 @@ export async function POST(request: NextRequest) {
                 type: InteractionResponseType.Pong,
             });
         case InteractionType.ApplicationCommand: {
-            const commandInteraction = {
-                ...interaction,
-                ...interaction.data,
-                commandName: interaction.data?.name,
-                user: interaction.user ?? interaction.member?.user,
-                channelId: interaction.channel_id,
-                createdTimestamp: Date.now(),
-                isChatInputCommand: () => true,
-                options: {
-                    getString: (name: string) => {
-                        const option = interaction.data?.options?.find(
-                            (opt) => opt.name === name
-                        );
-                        if (option && typeof option.value === "string") {
-                            return option.value;
-                        }
-                        return null;
-                    },
-                    getBoolean: (name: string) => {
-                        const option = interaction.data?.options?.find(
-                            (opt) => opt.name === name
-                        );
-                        if (option && typeof option.value === "boolean") {
-                            return option.value;
-                        }
-                        return null;
-                    },
-                },
-            } as unknown as CommandInteraction;
+            if (!isChatInputCommand(interaction)) {
+                return NextResponse.json(
+                    { error: "Unsupported application command type" },
+                    { status: 400 }
+                );
+            }
+
+            const commandInteraction = toCommandInteraction(interaction);
 
             const { data, error } = await tryCatch(
                 handleCommand(commandInteraction, {
@@ -136,7 +85,6 @@ export async function POST(request: NextRequest) {
                 });
             }
 
-            // Check if response contains a modal
             if (data.modal) {
                 return NextResponse.json({
                     type: InteractionResponseType.Modal,
@@ -152,80 +100,13 @@ export async function POST(request: NextRequest) {
                 },
             });
         }
-        case InteractionType.ModalSubmit: {
-            // Handle modal submission
-            const customId = interaction.data?.custom_id;
-
-            if (customId === "remind_modal") {
-                // Extract values from modal components
-                const components = interaction.data?.components ?? [];
-                const fields: Record<string, string> = {};
-
-                const collectFields = (node: unknown) => {
-                    if (!node) {
-                        return;
-                    }
-                    if (Array.isArray(node)) {
-                        for (const item of node) {
-                            collectFields(item);
-                        }
-                        return;
-                    }
-                    if (typeof node !== "object") {
-                        return;
-                    }
-
-                    const obj = node as Record<string, unknown>;
-                    const customId = obj.custom_id;
-
-                    if (typeof customId === "string") {
-                        const value = obj.value;
-                        const values = obj.values;
-
-                        if (typeof value === "string") {
-                            fields[customId] = value;
-                        } else if (Array.isArray(values)) {
-                            fields[customId] =
-                                (values[0] as string | undefined) ?? "";
-                        }
-                    }
-
-                    // Recurse into common nesting keys used by Discord payloads
-                    if (obj.components) {
-                        collectFields(obj.components);
-                    }
-                    if (obj.component) {
-                        collectFields(obj.component);
-                    }
-                };
-
-                collectFields(components);
-
+        case InteractionType.ModalSubmit:
+            if (interaction.data.custom_id === "remind_modal") {
+                const fields = collectModalFields(interaction);
                 const time = fields.time;
                 const message = fields.message;
-                const parseBool = (
-                    value: string | undefined,
-                    defaultValue: boolean
-                ) => {
-                    if (!value) {
-                        return defaultValue;
-                    }
-                    const v = value.trim().toLowerCase();
-                    if (["1", "true", "t", "yes", "y", "on"].includes(v)) {
-                        return true;
-                    }
-                    if (["0", "false", "f", "no", "n", "off"].includes(v)) {
-                        return false;
-                    }
-                    return defaultValue;
-                };
+                const ephemeral = fields.ephemeral === "true";
 
-                const publishToChannel = parseBool(fields.publish, false);
-                const ephemeral = publishToChannel
-                    ? false
-                    : parseBool(fields.ephemeral, true);
-
-                // Import and handle the reminder
                 const { handleModalReminder } =
                     await import("@/commands/reminder/remind-modal");
 
@@ -275,11 +156,121 @@ export async function POST(request: NextRequest) {
                     flags: MessageFlags.Ephemeral,
                 },
             });
-        }
         default:
             return NextResponse.json(
-                { error: "Unknown interaction type" },
+                { error: "Unsupported interaction type" },
                 { status: 400 }
             );
     }
+}
+
+function toCommandInteraction(
+    interaction: APIChatInputApplicationCommandInteraction
+): ApiCommandInteraction {
+    const findOption = (name: string) =>
+        findOptionValue(interaction.data.options, name);
+
+    const getString = (name: string) => {
+        const option = findOption(name);
+        return option?.type === ApplicationCommandOptionType.String &&
+            typeof option.value === "string"
+            ? option.value
+            : null;
+    };
+
+    const getBoolean = (name: string) => {
+        const option = findOption(name);
+        return option?.type === ApplicationCommandOptionType.Boolean &&
+            typeof option.value === "boolean"
+            ? option.value
+            : null;
+    };
+
+    return {
+        id: interaction.id,
+        commandName: interaction.data.name,
+        user: interaction.user ??
+            interaction.member?.user ?? {
+                id: "",
+                username: "unknown",
+            },
+        channelId: interaction.channel_id ?? null,
+        createdTimestamp: Date.now(),
+        isChatInputCommand: () => true,
+        options: {
+            getString,
+            getBoolean,
+        },
+    };
+}
+
+function isChatInputCommand(
+    interaction: APIInteraction
+): interaction is APIChatInputApplicationCommandInteraction {
+    return (
+        interaction.type === InteractionType.ApplicationCommand &&
+        interaction.data?.type === ApplicationCommandType.ChatInput
+    );
+}
+
+function findOptionValue(
+    options: APIApplicationCommandInteractionDataOption[] | undefined,
+    name: string
+): OptionWithValue | null {
+    if (!options?.length) {
+        return null;
+    }
+
+    for (const option of options) {
+        if ("options" in option && option.options) {
+            const nested = findOptionValue(option.options, name);
+            if (nested) {
+                return nested;
+            }
+        }
+
+        if (option.name === name && "value" in option) {
+            return option as OptionWithValue;
+        }
+    }
+
+    return null;
+}
+
+type OptionWithValue = APIApplicationCommandInteractionDataOption & {
+    value?: unknown;
+};
+
+function collectModalFields(interaction: APIModalSubmitInteraction) {
+    const fields: Record<string, string> = {};
+
+    const rows = (interaction.data.components ?? []) as Array<{
+        components?: Array<{
+            custom_id?: unknown;
+            value?: unknown;
+            values?: unknown;
+        }>;
+    }>;
+
+    for (const row of rows) {
+        for (const component of row.components ?? []) {
+            const customId = component.custom_id;
+
+            if (typeof customId !== "string") {
+                continue;
+            }
+
+            if (typeof component.value === "string") {
+                fields[customId] = component.value;
+                continue;
+            }
+
+            const values = component.values;
+            if (Array.isArray(values) && values[0]) {
+                fields[customId] = String(values[0]);
+            }
+        }
+    }
+
+    return fields;
 }

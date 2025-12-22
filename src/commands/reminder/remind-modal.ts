@@ -9,14 +9,13 @@ import {
     StringSelectMenuOptionBuilder,
     TextInputBuilder,
     TextInputStyle,
-    type CommandInteraction,
 } from "discord.js";
 import { start } from "workflow/api";
 
 import type { CommandResponse } from "@/lib/command-handler";
 import { redis } from "@/lib/redis";
 import { formatRelativeLA, parseSimpleDuration } from "@/lib/time-utils";
-import type { ForgetBotContext } from "@/lib/types";
+import type { ApiCommandInteraction, ForgetBotContext } from "@/lib/types";
 
 import { remindWorkflow } from "./remind.workflow";
 
@@ -34,7 +33,7 @@ export const data = new SlashCommandBuilder()
     );
 
 export async function execute(
-    interaction: CommandInteraction,
+    interaction: ApiCommandInteraction,
     _context: ForgetBotContext
 ): Promise<CommandResponse> {
     if (!interaction.isChatInputCommand()) {

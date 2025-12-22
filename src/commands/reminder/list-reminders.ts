@@ -3,14 +3,13 @@ import {
     ApplicationIntegrationType,
     InteractionContextType,
     SlashCommandBuilder,
-    type CommandInteraction,
 } from "discord.js";
 import { getRun } from "workflow/api";
 
 import type { CommandResponse } from "@/lib/command-handler";
 import { redis } from "@/lib/redis";
 import { tryCatch } from "@/lib/try-catch";
-import type { ForgetBotContext } from "@/lib/types";
+import type { ApiCommandInteraction, ForgetBotContext } from "@/lib/types";
 
 export const data = new SlashCommandBuilder()
     .setName("list-reminders")
@@ -23,7 +22,7 @@ export const data = new SlashCommandBuilder()
     );
 
 export async function execute(
-    interaction: CommandInteraction,
+    interaction: ApiCommandInteraction,
     _: ForgetBotContext
 ): Promise<CommandResponse> {
     if (!interaction.isChatInputCommand()) {

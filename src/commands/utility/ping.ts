@@ -2,11 +2,10 @@ import {
     ApplicationIntegrationType,
     InteractionContextType,
     SlashCommandBuilder,
-    type CommandInteraction,
 } from "discord.js";
 
 import type { CommandResponse } from "@/lib/command-handler";
-import type { ForgetBotContext } from "@/lib/types";
+import type { ApiCommandInteraction, ForgetBotContext } from "@/lib/types";
 
 export const data = new SlashCommandBuilder()
     .setName("ping")
@@ -19,7 +18,7 @@ export const data = new SlashCommandBuilder()
     );
 
 export async function execute(
-    _: CommandInteraction,
+    _: ApiCommandInteraction,
     __: ForgetBotContext
 ): Promise<CommandResponse> {
     return {
