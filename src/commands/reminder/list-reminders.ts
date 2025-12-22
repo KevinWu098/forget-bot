@@ -1,3 +1,4 @@
+import { formatDistanceToNow } from "date-fns";
 import {
     ApplicationIntegrationType,
     InteractionContextType,
@@ -8,15 +9,13 @@ import { getRun } from "workflow/api";
 
 import type { CommandResponse } from "@/lib/command-handler";
 import { redis } from "@/lib/redis";
+import { tryCatch } from "@/lib/try-catch";
 import type { ForgetBotContext } from "@/lib/types";
 
 export const data = new SlashCommandBuilder()
     .setName("list-reminders")
     .setDescription("List all your active reminders")
-    .setIntegrationTypes(
-        ApplicationIntegrationType.GuildInstall,
-        ApplicationIntegrationType.UserInstall
-    )
+    .setIntegrationTypes(ApplicationIntegrationType.UserInstall)
     .setContexts(
         InteractionContextType.Guild,
         InteractionContextType.BotDM,
@@ -35,115 +34,85 @@ export async function execute(
 
     const userId = interaction.user.id;
 
-    try {
-        const reminderIds = await redis.smembers(`user:${userId}:reminders`);
+    const { data: reminderIds, error } = await tryCatch(
+        redis.smembers(`user:${userId}:reminders`)
+    );
 
-        if (reminderIds.length === 0) {
-            return {
-                content: "You have no active reminders.",
-                ephemeral: true,
-            };
-        }
+    if (error) {
+        const errorMessage = "❌ Error listing reminders";
 
-        // Fetch details for each reminder
-        const activeReminders: Array<{
-            message: string;
-            scheduledFor: number;
-            timeRemaining: string;
-        }> = [];
+        console.error(`❌ Error listing reminders:`, error);
+        return {
+            content: errorMessage,
+            ephemeral: true,
+        };
+    }
 
-        for (const runId of reminderIds) {
-            try {
-                // Check if workflow is still running
-                const run = getRun(runId);
-                const status = await run.status;
+    if (!reminderIds.length) {
+        return {
+            content: "You have no active reminders.",
+            ephemeral: true,
+        };
+    }
 
-                if (status === "running") {
-                    // Get reminder metadata
-                    const reminderData = await redis.hgetall(
-                        `reminder:${runId}`
-                    );
+    const activeReminders: Array<{
+        message: string;
+        scheduledFor: number;
+        timeRemaining: string;
+    }> = [];
 
-                    if (reminderData && reminderData.message) {
-                        const scheduledFor = Number(reminderData.scheduledFor);
-                        const timeRemaining = formatTimeRemaining(
-                            scheduledFor - Date.now()
-                        );
+    await Promise.all(
+        reminderIds.map(async (runId) => {
+            const { data: run, error } = await tryCatch(
+                Promise.resolve(getRun(runId))
+            );
 
-                        activeReminders.push({
-                            message:
-                                String(reminderData["message"]) ??
-                                "Message not found",
-                            scheduledFor,
-                            timeRemaining,
-                        });
-                    }
-                } else {
-                    await redis.srem(`user:${userId}:reminders`, runId);
-                    await redis.del(`reminder:${runId}`);
-                }
-            } catch (error) {
-                console.error(`Error fetching reminder ${runId}:`, error);
+            if (error) {
+                console.error(`❌ Error getting run ${runId}:`, error);
+                return runId;
+            }
+
+            const status = await run.status;
+            if (status !== "running" && status !== "pending") {
                 await redis.srem(`user:${userId}:reminders`, runId);
                 await redis.del(`reminder:${runId}`);
             }
-        }
 
-        if (activeReminders.length === 0) {
-            return {
-                content: "You have no active reminders.",
-                ephemeral: true,
-            };
-        }
+            const reminderData = await redis.hgetall(`reminder:${runId}`);
 
-        // Sort by scheduled time
-        activeReminders.sort((a, b) => a.scheduledFor - b.scheduledFor);
+            if (reminderData && reminderData.message) {
+                const scheduledFor = Number(reminderData.scheduledFor);
+                const timeRemaining = formatDistanceToNow(scheduledFor, {
+                    addSuffix: false,
+                });
 
-        // Format response
-        const reminderList = activeReminders
-            .map((reminder, index) => {
-                return `${index + 1}. **"${reminder.message}"** - in ${reminder.timeRemaining}`;
-            })
-            .join("\n");
+                activeReminders.push({
+                    message:
+                        String(reminderData["message"]) ?? "Message not found",
+                    scheduledFor,
+                    timeRemaining,
+                });
+            }
+        })
+    );
 
+    if (activeReminders.length === 0) {
         return {
-            content: `📋 **Your Active Reminders:**\n\n${reminderList}`,
-            ephemeral: true,
-        };
-    } catch (error) {
-        console.error("Error listing reminders:", error);
-        return {
-            content: `❌ Failed to list reminders. Please try again.`,
+            content: "You have no active reminders.",
             ephemeral: true,
         };
     }
-}
 
-function formatTimeRemaining(ms: number): string {
-    if (ms < 0) {
-        return "overdue";
-    }
+    activeReminders.sort((a, b) => a.scheduledFor - b.scheduledFor);
 
-    const seconds = Math.floor(ms / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const hours = Math.floor(minutes / 60);
-    const days = Math.floor(hours / 24);
+    const reminderList = activeReminders
+        .map((reminder, index) => {
+            return `${index + 1}. **"${reminder.message}"** - in ${reminder.timeRemaining}`;
+        })
+        .join("\n");
 
-    if (days > 0) {
-        const remainingHours = hours % 24;
-        return remainingHours > 0 ? `${days}d ${remainingHours}h` : `${days}d`;
-    }
-    if (hours > 0) {
-        const remainingMinutes = minutes % 60;
-        return remainingMinutes > 0
-            ? `${hours}h ${remainingMinutes}m`
-            : `${hours}h`;
-    }
-    if (minutes > 0) {
-        const remainingSeconds = seconds % 60;
-        return remainingSeconds > 0
-            ? `${minutes}m ${remainingSeconds}s`
-            : `${minutes}m`;
-    }
-    return `${seconds}s`;
+    return {
+        content: `📋 **Your Active Reminders:**\n\n${reminderList}`,
+        ephemeral: true,
+    };
 }
