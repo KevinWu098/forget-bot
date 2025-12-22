@@ -9,8 +9,8 @@
         "prebuild": "pnpm deploy-commands:prod",
         "build": "next build",
         "start": "next start",
-        "deploy-commands": "tsx src/deploy-commands.ts",
-        "deploy-commands:prod": "NODE_ENV=production tsx src/deploy-commands.ts"
+        "deploy-commands": "tsx src/lib/deploy-commands.ts",
+        "deploy-commands:prod": "NODE_ENV=production tsx src/lib/deploy-commands.ts"
     },
     "dependencies": {
         "@t3-oss/env-nextjs": "^0.13.10",

@@ -3,6 +3,7 @@ import type { NodeEnv } from "@/env";
 import type { CommandInteraction, ModalBuilder } from "discord.js";
 
 import { WHITELIST } from "@/lib/constants";
+import { tryCatch } from "@/lib/try-catch";
 import type { ForgetBotContext } from "@/lib/types";
 
 export type CommandResponse = {
@@ -26,23 +27,33 @@ export async function handleCommand(
     }
 
     const commandName = interaction.commandName;
-
-    if (!commandName) {
-        throw new Error("No command name found in interaction");
-    }
-
     const command = commands.get(commandName);
 
     if (!command) {
-        throw new Error(`Command "${commandName}" not found`);
+        return {
+            content: `❌ Command "${commandName}" not found`,
+            ephemeral: true,
+        };
     }
 
-    const result = await command.execute(interaction, context);
+    const { data, error } = await tryCatch(
+        command.execute(interaction, context)
+    );
+
+    if (error) {
+        const errorMessage = `❌ Error executing command "${commandName}"`;
+
+        console.error(`${errorMessage}:`, error);
+        return {
+            content: errorMessage,
+            ephemeral: true,
+        };
+    }
 
     return {
-        content: withEnvironment(result.content, context.environment),
-        ephemeral: result.ephemeral,
-        modal: result.modal,
+        content: withEnvironment(data.content, context.environment),
+        ephemeral: data.ephemeral,
+        modal: data.modal,
     };
 }
 
