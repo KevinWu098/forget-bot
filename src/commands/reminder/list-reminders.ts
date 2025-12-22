@@ -80,7 +80,7 @@ export async function execute(
             const reminderData = await redis.hgetall(`reminder:${runId}`);
 
             if (reminderData && reminderData.message) {
-                const scheduledFor = Number(reminderData.scheduledFor);
+                const scheduledFor = Number(reminderData.scheduledForMs);
                 const timeRemaining = formatDistanceToNow(scheduledFor, {
                     addSuffix: false,
                 });

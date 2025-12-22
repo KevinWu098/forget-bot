@@ -1,26 +1,31 @@
 import { commands } from "@/commands";
 import type { NodeEnv } from "@/env";
-import type { ModalBuilder } from "discord.js";
+import type { ActionRowBuilder, ButtonBuilder, ModalBuilder } from "discord.js";
 
 import { WHITELIST } from "@/lib/constants";
 import { tryCatch } from "@/lib/try-catch";
-import type { ApiCommandInteraction, ForgetBotContext } from "@/lib/types";
+import type {
+    ApiCommandInteraction,
+    ApiMessageContextInteraction,
+    ForgetBotContext,
+} from "@/lib/types";
 
 export type CommandResponse = {
     content: string;
     ephemeral?: boolean;
     modal?: ModalBuilder;
+    components?: ActionRowBuilder<ButtonBuilder>[];
 };
 
 export async function handleCommand(
-    interaction: ApiCommandInteraction,
+    interaction: ApiCommandInteraction | ApiMessageContextInteraction,
     context: ForgetBotContext
 ): Promise<CommandResponse> {
     if (!WHITELIST.has(interaction.user.id)) {
         return {
             content: [
                 "🚫 **Access denied**",
-                "You don’t have permission to forget.",
+                "You don't have permission to forget.",
             ].join("\n"),
             ephemeral: true,
         };
@@ -54,6 +59,7 @@ export async function handleCommand(
         content: withEnvironment(data.content, context.environment),
         ephemeral: data.ephemeral,
         modal: data.modal,
+        components: data.components,
     };
 }
 

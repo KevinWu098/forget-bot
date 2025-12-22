@@ -7,6 +7,10 @@ import {
     execute as remindExecute,
 } from "@/commands/reminder/remind";
 import {
+    data as remindMessageData,
+    execute as remindMessageExecute,
+} from "@/commands/reminder/remind-message";
+import {
     data as remindModalData,
     execute as remindModalExecute,
 } from "@/commands/reminder/remind-modal";
@@ -14,29 +18,60 @@ import {
     data as pingData,
     execute as pingExecute,
 } from "@/commands/utility/ping";
-import type { SlashCommandOptionsOnlyBuilder } from "discord.js";
+import type {
+    ContextMenuCommandBuilder,
+    SlashCommandOptionsOnlyBuilder,
+} from "discord.js";
 
 import type { CommandResponse } from "@/lib/command-handler";
-import type { ApiCommandInteraction, ForgetBotContext } from "@/lib/types";
+import type {
+    ApiCommandInteraction,
+    ApiMessageContextInteraction,
+    ForgetBotContext,
+} from "@/lib/types";
 
-export const commands = new Map<
-    string,
-    {
-        data: SlashCommandOptionsOnlyBuilder;
-        execute: (
-            interaction: ApiCommandInteraction,
-            context: ForgetBotContext
-        ) => Promise<CommandResponse>;
-    }
->([
-    [pingData.name, { data: pingData, execute: pingExecute }],
-    [remindData.name, { data: remindData, execute: remindExecute }],
+type Command = {
+    data: SlashCommandOptionsOnlyBuilder | ContextMenuCommandBuilder;
+    execute: (
+        interaction: ApiCommandInteraction | ApiMessageContextInteraction,
+        context: ForgetBotContext
+    ) => Promise<CommandResponse>;
+};
+
+function createCommand<
+    T extends ApiCommandInteraction | ApiMessageContextInteraction,
+>(command: {
+    data: SlashCommandOptionsOnlyBuilder | ContextMenuCommandBuilder;
+    execute: (
+        interaction: T,
+        context: ForgetBotContext
+    ) => Promise<CommandResponse>;
+}): Command {
+    return command as Command;
+}
+
+export const commands = new Map<string, Command>([
+    [pingData.name, createCommand({ data: pingData, execute: pingExecute })],
+    [
+        remindData.name,
+        createCommand({ data: remindData, execute: remindExecute }),
+    ],
     [
         remindModalData.name,
-        { data: remindModalData, execute: remindModalExecute },
+        createCommand({ data: remindModalData, execute: remindModalExecute }),
     ],
     [
         listRemindersData.name,
-        { data: listRemindersData, execute: listRemindersExecute },
+        createCommand({
+            data: listRemindersData,
+            execute: listRemindersExecute,
+        }),
+    ],
+    [
+        remindMessageData.name,
+        createCommand({
+            data: remindMessageData,
+            execute: remindMessageExecute,
+        }),
     ],
 ]);

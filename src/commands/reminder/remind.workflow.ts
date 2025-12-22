@@ -7,7 +7,9 @@ export async function remindWorkflow(
     message: string,
     ephemeral: boolean,
     userId: string,
-    environment: NodeEnv
+    environment: NodeEnv,
+    messageLink?: string,
+    messagePreview?: string
 ) {
     "use workflow";
 
@@ -19,7 +21,14 @@ export async function remindWorkflow(
 
     await sleep(durationMs);
 
-    await sendDiscordMessage(userId, message, environment, scheduledForMs);
+    await sendDiscordMessage(
+        userId,
+        message,
+        environment,
+        scheduledForMs,
+        messageLink,
+        messagePreview
+    );
 
     return {
         content: message,
@@ -31,7 +40,9 @@ async function sendDiscordMessage(
     userId: string,
     message: string,
     environment: "development" | "production",
-    scheduledFor: number
+    scheduledFor: number,
+    messageLink?: string,
+    messagePreview?: string
 ) {
     "use step";
 
@@ -47,7 +58,15 @@ async function sendDiscordMessage(
     const rest = new REST({ version: "10" }).setToken(token);
 
     try {
-        const content = `⏰ **Reminder:** ${message}`;
+        let content: string;
+
+        if (messageLink && messagePreview) {
+            // This is a message context menu reminder
+            content = `⏰ **Reminder about this message:**\n\n> ${messagePreview}\n\n[Jump to message](${messageLink})`;
+        } else {
+            // This is a regular text reminder
+            content = `⏰ **Reminder:** ${message}`;
+        }
 
         const dmChannel = (await rest.post(Routes.userChannels(), {
             body: { recipient_id: userId },
@@ -71,7 +90,7 @@ async function sendDiscordMessage(
             if (
                 reminderData &&
                 reminderData.message === message &&
-                reminderData.scheduledFor === String(scheduledFor)
+                reminderData.scheduledForMs === String(scheduledFor)
             ) {
                 await redis.srem(`user:${userId}:reminders`, runId);
                 await redis.del(`reminder:${runId}`);

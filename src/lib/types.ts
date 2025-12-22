@@ -22,3 +22,24 @@ export type ApiCommandInteraction = {
         getBoolean: (name: string) => boolean | null;
     };
 };
+
+/**
+ * Minimal shape of a message context menu interaction.
+ */
+export type ApiMessageContextInteraction = {
+    id: string;
+    commandName: string;
+    user: {
+        id: string;
+        username?: string;
+    };
+    targetMessage: {
+        id: string;
+        content: string;
+        channelId: string;
+        guildId?: string;
+        url: string;
+    };
+    createdTimestamp: number;
+    isMessageContextMenuCommand: () => boolean;
+};

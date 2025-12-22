@@ -137,7 +137,7 @@ export async function handleModalReminder(params: {
         await redis.hset(`reminder:${runId}`, {
             message,
             userId,
-            scheduledFor: scheduledForMs,
+            scheduledForMs,
             createdAt: sentAt,
         });
 

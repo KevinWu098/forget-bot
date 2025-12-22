@@ -4,19 +4,24 @@ import { env } from "@/env";
 import {
     ApplicationCommandOptionType,
     ApplicationCommandType,
+    ComponentType,
     InteractionResponseType,
     InteractionType,
     MessageFlags,
     type APIApplicationCommandInteractionDataOption,
     type APIChatInputApplicationCommandInteraction,
     type APIInteraction,
+    type APIMessageApplicationCommandInteraction,
     type APIModalSubmitInteraction,
 } from "discord-api-types/v10";
 import { verifyKey } from "discord-interactions";
 
 import { handleCommand } from "@/lib/command-handler";
 import { tryCatch } from "@/lib/try-catch";
-import type { ApiCommandInteraction } from "@/lib/types";
+import type {
+    ApiCommandInteraction,
+    ApiMessageContextInteraction,
+} from "@/lib/types";
 
 export async function POST(request: NextRequest) {
     const signature = request.headers.get("x-signature-ed25519");
@@ -59,44 +64,246 @@ export async function POST(request: NextRequest) {
                 type: InteractionResponseType.Pong,
             });
         case InteractionType.ApplicationCommand: {
-            if (!isChatInputCommand(interaction)) {
-                return NextResponse.json(
-                    { error: "Unsupported application command type" },
-                    { status: 400 }
+            if (isChatInputCommand(interaction)) {
+                const commandInteraction = toCommandInteraction(interaction);
+
+                const { data, error } = await tryCatch(
+                    handleCommand(commandInteraction, {
+                        environment: env.NODE_ENV,
+                    })
                 );
-            }
 
-            const commandInteraction = toCommandInteraction(interaction);
+                if (error) {
+                    console.error("❌ Error executing command:", error);
+                    return NextResponse.json({
+                        type: InteractionResponseType.ChannelMessageWithSource,
+                        data: {
+                            content:
+                                "There was an error executing this command!",
+                            flags: MessageFlags.Ephemeral,
+                        },
+                    });
+                }
 
-            const { data, error } = await tryCatch(
-                handleCommand(commandInteraction, {
-                    environment: env.NODE_ENV,
-                })
-            );
+                if (data.modal) {
+                    return NextResponse.json({
+                        type: InteractionResponseType.Modal,
+                        data: data.modal.toJSON(),
+                    });
+                }
 
-            if (error) {
-                console.error("❌ Error executing command:", error);
                 return NextResponse.json({
                     type: InteractionResponseType.ChannelMessageWithSource,
                     data: {
-                        content: "There was an error executing this command!",
-                        flags: MessageFlags.Ephemeral,
+                        content: data.content,
+                        flags: data.ephemeral
+                            ? MessageFlags.Ephemeral
+                            : undefined,
+                        components: data.components?.map((c) => c.toJSON()),
+                    },
+                });
+            } else if (isMessageContextMenuCommand(interaction)) {
+                const messageInteraction =
+                    toMessageContextInteraction(interaction);
+
+                const { data, error } = await tryCatch(
+                    handleCommand(messageInteraction, {
+                        environment: env.NODE_ENV,
+                    })
+                );
+
+                if (error) {
+                    console.error(
+                        "❌ Error executing message context command:",
+                        error
+                    );
+                    return NextResponse.json({
+                        type: InteractionResponseType.ChannelMessageWithSource,
+                        data: {
+                            content:
+                                "There was an error executing this command!",
+                            flags: MessageFlags.Ephemeral,
+                        },
+                    });
+                }
+
+                return NextResponse.json({
+                    type: InteractionResponseType.ChannelMessageWithSource,
+                    data: {
+                        content: data.content,
+                        flags: data.ephemeral
+                            ? MessageFlags.Ephemeral
+                            : undefined,
+                        components: data.components?.map((c) => c.toJSON()),
                     },
                 });
             }
 
-            if (data.modal) {
-                return NextResponse.json({
-                    type: InteractionResponseType.Modal,
-                    data: data.modal.toJSON(),
-                });
+            return NextResponse.json(
+                { error: "Unsupported application command type" },
+                { status: 400 }
+            );
+        }
+        case InteractionType.MessageComponent: {
+            if (
+                interaction.type !== InteractionType.MessageComponent ||
+                !("data" in interaction) ||
+                !("component_type" in interaction.data)
+            ) {
+                break;
+            }
+
+            const componentInteraction = interaction;
+
+            // Handle button clicks for reminder preset times
+            if (
+                componentInteraction.data.component_type ===
+                ComponentType.Button
+            ) {
+                const customId = componentInteraction.data.custom_id;
+
+                if (customId.startsWith("remind_")) {
+                    const parts = customId.split(":");
+                    const presetPart = parts[0];
+                    const messageId = parts[1];
+                    const channelId = parts[2];
+
+                    if (presetPart && messageId && channelId) {
+                        const preset = presetPart.replace("remind_", "");
+
+                        const {
+                            parsePresetTime,
+                            handleReminderCreation,
+                            createMessageLink,
+                            createMessagePreview,
+                        } = await import("@/commands/reminder/remind-message");
+
+                        const userId =
+                            componentInteraction.user?.id ??
+                            componentInteraction.member?.user?.id ??
+                            "";
+
+                        let durationMs: number | null;
+
+                        if (preset === "custom") {
+                            // TODO: Handle custom time input via modal
+                            return NextResponse.json({
+                                type: InteractionResponseType.ChannelMessageWithSource,
+                                data: {
+                                    content:
+                                        "❌ Custom time entry is not yet implemented. Please use a preset time.",
+                                    flags: MessageFlags.Ephemeral,
+                                },
+                            });
+                        } else {
+                            durationMs = parsePresetTime(preset);
+                        }
+
+                        if (!durationMs) {
+                            return NextResponse.json({
+                                type: InteractionResponseType.ChannelMessageWithSource,
+                                data: {
+                                    content: `❌ Invalid time preset: ${preset}`,
+                                    flags: MessageFlags.Ephemeral,
+                                },
+                            });
+                        }
+
+                        // Try to get cached message content first
+                        const { redis } = await import("@/lib/redis");
+                        const cacheKey = `msg_cache:${messageId}`;
+                        let messageContent = await redis.get<string>(cacheKey);
+
+                        // Get cached guild ID if available
+                        const cachedGuildId = await redis.get<string>(
+                            `msg_guild:${messageId}`
+                        );
+                        const guildId =
+                            componentInteraction.guild_id ??
+                            cachedGuildId ??
+                            undefined;
+
+                        // If not cached, try to fetch from Discord API
+                        if (!messageContent) {
+                            const { REST, Routes } = await import("discord.js");
+                            const token =
+                                env.NODE_ENV === "production"
+                                    ? env.DISCORD_TOKEN
+                                    : env.DISCORD_TOKEN_DEV;
+                            const rest = new REST({ version: "10" }).setToken(
+                                token
+                            );
+
+                            try {
+                                const message = (await rest.get(
+                                    Routes.channelMessage(channelId, messageId)
+                                )) as { content?: string };
+                                messageContent =
+                                    message.content ?? "[No content]";
+                            } catch (error) {
+                                console.error(
+                                    "Failed to fetch message content:",
+                                    error
+                                );
+                                messageContent =
+                                    "[Unable to fetch message content]";
+                            }
+                        }
+
+                        const messageLink = createMessageLink(
+                            messageId,
+                            channelId,
+                            guildId
+                        );
+
+                        const messagePreview =
+                            createMessagePreview(messageContent);
+
+                        const { data, error } = await tryCatch(
+                            handleReminderCreation({
+                                durationMs,
+                                userId,
+                                messageContent,
+                                messageLink,
+                                messagePreview,
+                                sentAt: Date.now(),
+                                environment:
+                                    env.NODE_ENV === "production"
+                                        ? "production"
+                                        : "development",
+                            })
+                        );
+
+                        if (error) {
+                            console.error(
+                                "❌ Error handling button interaction:",
+                                error
+                            );
+                            return NextResponse.json({
+                                type: InteractionResponseType.ChannelMessageWithSource,
+                                data: {
+                                    content: `❌ ${error instanceof Error ? error.message : "Failed to set reminder."}`,
+                                    flags: MessageFlags.Ephemeral,
+                                },
+                            });
+                        }
+
+                        return NextResponse.json({
+                            type: InteractionResponseType.ChannelMessageWithSource,
+                            data: {
+                                content: data.content,
+                                flags: MessageFlags.Ephemeral,
+                            },
+                        });
+                    }
+                }
             }
 
             return NextResponse.json({
                 type: InteractionResponseType.ChannelMessageWithSource,
                 data: {
-                    content: data.content,
-                    flags: data.ephemeral ? MessageFlags.Ephemeral : undefined,
+                    content: "Unknown component interaction",
+                    flags: MessageFlags.Ephemeral,
                 },
             });
         }
@@ -211,6 +418,49 @@ function isChatInputCommand(
         interaction.type === InteractionType.ApplicationCommand &&
         interaction.data?.type === ApplicationCommandType.ChatInput
     );
+}
+
+function isMessageContextMenuCommand(
+    interaction: APIInteraction
+): interaction is APIMessageApplicationCommandInteraction {
+    return (
+        interaction.type === InteractionType.ApplicationCommand &&
+        interaction.data?.type === ApplicationCommandType.Message
+    );
+}
+
+function toMessageContextInteraction(
+    interaction: APIMessageApplicationCommandInteraction
+): ApiMessageContextInteraction {
+    const targetMessage =
+        interaction.data.resolved?.messages?.[interaction.data.target_id];
+
+    const guildId = interaction.guild_id;
+    const channelId = interaction.channel?.id ?? interaction.channel_id ?? "";
+    const messageId = interaction.data.target_id;
+
+    const messageLink = guildId
+        ? `https://discord.com/channels/${guildId}/${channelId}/${messageId}`
+        : `https://discord.com/channels/@me/${channelId}/${messageId}`;
+
+    return {
+        id: interaction.id,
+        commandName: interaction.data.name,
+        user: interaction.user ??
+            interaction.member?.user ?? {
+                id: "",
+                username: "unknown",
+            },
+        targetMessage: {
+            id: messageId,
+            content: targetMessage?.content ?? "",
+            channelId,
+            guildId: guildId ?? undefined,
+            url: messageLink,
+        },
+        createdTimestamp: Date.now(),
+        isMessageContextMenuCommand: () => true,
+    };
 }
 
 function findOptionValue(
