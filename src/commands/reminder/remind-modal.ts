@@ -43,12 +43,10 @@ export async function execute(
         };
     }
 
-    // Create the modal
     const modal = new ModalBuilder()
         .setCustomId("remind_modal")
         .setTitle("Set a Reminder");
 
-    // Add time input
     const timeInput = new TextInputBuilder()
         .setCustomId("time")
         .setStyle(TextInputStyle.Short)
@@ -56,7 +54,6 @@ export async function execute(
         .setRequired(true)
         .setMaxLength(100);
 
-    // Add message input
     const messageInput = new TextInputBuilder()
         .setCustomId("message")
         .setStyle(TextInputStyle.Paragraph)
@@ -78,31 +75,25 @@ export async function execute(
                 .setValue("false")
         );
 
-    // Create action rows (ActionRowBuilder is required for modal components)
     const timeLabel = new LabelBuilder()
         .setLabel("When?")
         .setTextInputComponent(timeInput);
     const messageLabel = new LabelBuilder()
         .setLabel("What to remind you about?")
         .setTextInputComponent(messageInput);
-
     const ephemeralLabel = new LabelBuilder()
         .setLabel("Ephemeral?")
         .setStringSelectMenuComponent(ephemeralSelect);
 
-    // Add rows to the modal
     modal.addLabelComponents(timeLabel, messageLabel);
     modal.addLabelComponents(ephemeralLabel);
 
-    // Show the modal - this is done through Discord's interaction response
-    // We need to return a special response type that the API route will handle
     return {
-        content: "", // Not used for modals
+        content: "",
         modal: modal,
-    } as CommandResponse & { modal: ModalBuilder };
+    };
 }
 
-// Handle modal submission
 export async function handleModalReminder(params: {
     time: string;
     message: string;

@@ -6,6 +6,7 @@ import {
     ApplicationCommandType,
     InteractionResponseType,
     InteractionType,
+    MessageFlags,
     type CommandInteraction,
 } from "discord.js";
 import z from "zod";
@@ -130,7 +131,7 @@ export async function POST(request: NextRequest) {
                     type: InteractionResponseType.ChannelMessageWithSource,
                     data: {
                         content: "There was an error executing this command!",
-                        flags: 64, // ephemeral
+                        flags: MessageFlags.Ephemeral,
                     },
                 });
             }
@@ -147,7 +148,7 @@ export async function POST(request: NextRequest) {
                 type: InteractionResponseType.ChannelMessageWithSource,
                 data: {
                     content: data.content,
-                    flags: data.ephemeral ? 64 : undefined, // 64 = ephemeral flag
+                    flags: data.ephemeral ? MessageFlags.Ephemeral : undefined,
                 },
             });
         }
@@ -253,7 +254,7 @@ export async function POST(request: NextRequest) {
                         type: InteractionResponseType.ChannelMessageWithSource,
                         data: {
                             content: `❌ ${error instanceof Error ? error.message : "Failed to set reminder. Please try again."}`,
-                            flags: 64,
+                            flags: MessageFlags.Ephemeral,
                         },
                     });
                 }
@@ -262,7 +263,9 @@ export async function POST(request: NextRequest) {
                     type: InteractionResponseType.ChannelMessageWithSource,
                     data: {
                         content: data.content,
-                        flags: data.ephemeral ? 64 : undefined,
+                        flags: data.ephemeral
+                            ? MessageFlags.Ephemeral
+                            : undefined,
                     },
                 });
             }
@@ -271,7 +274,7 @@ export async function POST(request: NextRequest) {
                 type: InteractionResponseType.ChannelMessageWithSource,
                 data: {
                     content: "Unknown modal submission",
-                    flags: 64,
+                    flags: MessageFlags.Ephemeral,
                 },
             });
         }
