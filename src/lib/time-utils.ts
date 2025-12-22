@@ -1,3 +1,5 @@
+import * as chrono from "chrono-node";
+
 const LA_TZ = "America/Los_Angeles";
 
 type YMD = { y: number; m: number; d: number };
@@ -93,13 +95,18 @@ export function formatRelativeLA(
 }
 
 /**
- * Parses simple duration formats like "5 minutes", "30 seconds", "2 hours", etc.
- * Supports: seconds (s), minutes (m), hours (h), days (d), weeks (w)
+ * Parses duration or natural language time expressions.
+ * Supports: seconds (s), minutes (m), hours (h), days (d), weeks (w), and
+ * natural phrases like "in 5 minutes" or "tomorrow at 3pm" via chrono-node.
  * @param time - Time string to parse (e.g., "5 minutes", "2h", "30s")
  * @returns Duration in milliseconds, or null if parsing fails
  */
-export function parseSimpleDuration(time: string): number | null {
-    const normalized = time.toLowerCase().trim();
+export function parseSimpleDuration(
+    time: string,
+    nowMs: number = Date.now()
+): number | null {
+    const trimmed = time.trim();
+    const normalized = trimmed.toLowerCase();
 
     const patterns = [
         { regex: /^(\d+\.?\d*)\s*(seconds?|secs?|s)$/i, multiplier: 1000 },
@@ -131,5 +138,16 @@ export function parseSimpleDuration(time: string): number | null {
         }
     }
 
-    return null;
+    // Fall back to chrono for natural language (e.g., "in 5 minutes", "tomorrow at 3pm")
+    const referenceDate = new Date(nowMs);
+    const parsedDate = chrono.parseDate(trimmed, referenceDate, {
+        forwardDate: true,
+    });
+
+    if (!parsedDate) {
+        return null;
+    }
+
+    const durationMs = parsedDate.getTime() - nowMs;
+    return durationMs > 0 ? durationMs : null;
 }

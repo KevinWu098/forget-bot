@@ -116,7 +116,7 @@ export async function handleModalReminder(params: {
 
         if (durationMs === 0) {
             return {
-                content: `❌ Could not parse time "${time}". Please use formats like "5 minutes", "2 hours", "30 seconds", etc.`,
+                content: `❌ Could not parse time "${time}". Please use formats like "5 minutes", "2 hours", "tomorrow at 3pm", or "next Friday at noon".`,
                 ephemeral: true,
             };
         }
