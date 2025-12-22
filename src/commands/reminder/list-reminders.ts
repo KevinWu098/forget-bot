@@ -13,7 +13,10 @@ import type { ForgetBotContext } from "@/lib/types";
 export const data = new SlashCommandBuilder()
     .setName("list-reminders")
     .setDescription("List all your active reminders")
-    .setIntegrationTypes(ApplicationIntegrationType.UserInstall)
+    .setIntegrationTypes(
+        ApplicationIntegrationType.GuildInstall,
+        ApplicationIntegrationType.UserInstall
+    )
     .setContexts(
         InteractionContextType.Guild,
         InteractionContextType.BotDM,

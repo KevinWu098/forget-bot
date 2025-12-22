@@ -7,7 +7,8 @@ export async function remindWorkflow(
     ephemeral: boolean,
     userId: string,
     channelId: string | undefined,
-    environment: "development" | "production"
+    environment: "development" | "production",
+    publishToChannel: boolean
 ) {
     "use workflow";
 
@@ -22,7 +23,15 @@ export async function remindWorkflow(
 
     await sleep(durationMs);
 
-    await sendDiscordMessage(userId, message, channelId, environment);
+    const scheduledFor = sentAt + durationMs;
+    await sendDiscordMessage(
+        userId,
+        message,
+        channelId,
+        environment,
+        publishToChannel,
+        scheduledFor
+    );
 
     return {
         content: message,
@@ -79,8 +88,10 @@ function calculateDuration(time: string, _sentAt: number): number | null {
 async function sendDiscordMessage(
     userId: string,
     message: string,
-    _channelId: string | undefined,
-    environment: "development" | "production"
+    channelId: string | undefined,
+    environment: "development" | "production",
+    publishToChannel: boolean,
+    scheduledFor: number
 ) {
     "use step";
 
@@ -97,17 +108,37 @@ async function sendDiscordMessage(
     const rest = new REST({ version: "10" }).setToken(token);
 
     try {
-        const dmChannel = (await rest.post(Routes.userChannels(), {
-            body: {
-                recipient_id: userId,
-            },
-        })) as { id: string };
+        const content = `⏰ **Reminder:** ${message}`;
 
-        await rest.post(Routes.channelMessages(dmChannel.id), {
-            body: {
-                content: `⏰ **Reminder:** ${message}`,
-            },
-        });
+        // Try publishing to the originating channel if requested.
+        // If that fails (missing perms/app not installed to guild/etc), fall back to DM.
+        if (publishToChannel && channelId) {
+            try {
+                await rest.post(Routes.channelMessages(channelId), {
+                    body: { content },
+                });
+            } catch (error) {
+                console.warn(
+                    "Channel publish failed; falling back to DM",
+                    error
+                );
+                const dmChannel = (await rest.post(Routes.userChannels(), {
+                    body: { recipient_id: userId },
+                })) as { id: string };
+                await rest.post(Routes.channelMessages(dmChannel.id), {
+                    body: {
+                        content: `${content}\n\n(Couldn’t publish in the channel, so I DM’d you instead.)`,
+                    },
+                });
+            }
+        } else {
+            const dmChannel = (await rest.post(Routes.userChannels(), {
+                body: { recipient_id: userId },
+            })) as { id: string };
+            await rest.post(Routes.channelMessages(dmChannel.id), {
+                body: { content },
+            });
+        }
 
         console.info(
             `✅ [${environment.toUpperCase()}] Reminder sent to user ${userId}: ${message}`
@@ -116,9 +147,15 @@ async function sendDiscordMessage(
         const reminderIds = await redis.smembers(`user:${userId}:reminders`);
 
         for (const runId of reminderIds) {
-            const reminderData = await redis.hgetall(`reminder:${runId}`);
+            const reminderData = (await redis.hgetall(
+                `reminder:${runId}`
+            )) as Record<string, string>;
 
-            if (reminderData && reminderData.message === message) {
+            if (
+                reminderData &&
+                reminderData.message === message &&
+                reminderData.scheduledFor === String(scheduledFor)
+            ) {
                 await redis.srem(`user:${userId}:reminders`, runId);
                 await redis.del(`reminder:${runId}`);
                 break;

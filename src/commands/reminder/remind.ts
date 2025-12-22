@@ -1,4 +1,3 @@
-import { formatRelative } from "date-fns";
 import {
     ApplicationIntegrationType,
     InteractionContextType,
@@ -8,6 +7,7 @@ import {
 import { start } from "workflow/api";
 
 import type { CommandResponse } from "@/lib/command-handler";
+import { formatRelativeLA } from "@/lib/format-la-relative";
 import { parseSimpleDuration } from "@/lib/parse-duration";
 import { redis } from "@/lib/redis";
 import type { ForgetBotContext } from "@/lib/types";
@@ -17,7 +17,10 @@ import { remindWorkflow } from "./remind.workflow";
 export const data = new SlashCommandBuilder()
     .setName("remind-me")
     .setDescription("Set a reminder")
-    .setIntegrationTypes(ApplicationIntegrationType.UserInstall)
+    .setIntegrationTypes(
+        ApplicationIntegrationType.GuildInstall,
+        ApplicationIntegrationType.UserInstall
+    )
     .setContexts(
         InteractionContextType.Guild,
         InteractionContextType.BotDM,
@@ -81,6 +84,7 @@ export async function execute(
             userId,
             channelId,
             context?.environment,
+            false,
         ]);
 
         const runId = run.runId;
@@ -96,7 +100,7 @@ export async function execute(
         // Set expiration for metadata (365 days)
         await redis.expire(`reminder:${runId}`, 365 * 24 * 60 * 60);
 
-        const relativeTime = formatRelative(new Date(scheduledFor), new Date());
+        const relativeTime = formatRelativeLA(scheduledFor, sentAt);
 
         return {
             content: `✅ Reminder set! I'll remind you about "${message}" ${relativeTime}`,

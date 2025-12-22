@@ -11,7 +11,10 @@ import type { ForgetBotContext } from "@/lib/types";
 export const data = new SlashCommandBuilder()
     .setName("ping")
     .setDescription("Replies with Hello World!")
-    .setIntegrationTypes(ApplicationIntegrationType.UserInstall)
+    .setIntegrationTypes(
+        ApplicationIntegrationType.GuildInstall,
+        ApplicationIntegrationType.UserInstall
+    )
     .setContexts(
         InteractionContextType.Guild,
         InteractionContextType.BotDM,

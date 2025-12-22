@@ -1,6 +1,6 @@
 import { commands } from "@/commands";
 import type { NodeEnv } from "@/env";
-import type { CommandInteraction } from "discord.js";
+import type { CommandInteraction, ModalBuilder } from "discord.js";
 
 import { WHITELIST } from "@/lib/constants";
 import type { ForgetBotContext } from "@/lib/types";
@@ -8,6 +8,7 @@ import type { ForgetBotContext } from "@/lib/types";
 export type CommandResponse = {
     content: string;
     ephemeral?: boolean;
+    modal?: ModalBuilder;
 };
 
 export async function handleCommand(
@@ -41,6 +42,7 @@ export async function handleCommand(
     return {
         content: withEnvironment(result.content, context.environment),
         ephemeral: result.ephemeral,
+        modal: result.modal,
     };
 }
 

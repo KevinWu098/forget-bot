@@ -56,9 +56,13 @@ export async function POST(request: NextRequest) {
             .optional(),
         data: z
             .object({
-                id: z.string(),
-                name: z.string(),
-                type: z.enum(ApplicationCommandType),
+                id: z.string().optional(),
+                name: z.string().optional(),
+                type: z.enum(ApplicationCommandType).optional(),
+                custom_id: z.string().optional(),
+                // Modal submit component payloads can vary by client/library version.
+                // Keep this permissive and do robust extraction below.
+                components: z.array(z.any()).optional(),
                 options: z
                     .array(
                         z.object({
@@ -131,11 +135,143 @@ export async function POST(request: NextRequest) {
                 });
             }
 
+            // Check if response contains a modal
+            if (data.modal) {
+                return NextResponse.json({
+                    type: InteractionResponseType.Modal,
+                    data: data.modal.toJSON(),
+                });
+            }
+
             return NextResponse.json({
                 type: InteractionResponseType.ChannelMessageWithSource,
                 data: {
                     content: data.content,
                     flags: data.ephemeral ? 64 : undefined, // 64 = ephemeral flag
+                },
+            });
+        }
+        case InteractionType.ModalSubmit: {
+            // Handle modal submission
+            const customId = interaction.data?.custom_id;
+
+            if (customId === "remind_modal") {
+                // Extract values from modal components
+                const components = interaction.data?.components ?? [];
+                const fields: Record<string, string> = {};
+
+                const collectFields = (node: unknown) => {
+                    if (!node) {
+                        return;
+                    }
+                    if (Array.isArray(node)) {
+                        for (const item of node) {
+                            collectFields(item);
+                        }
+                        return;
+                    }
+                    if (typeof node !== "object") {
+                        return;
+                    }
+
+                    const obj = node as Record<string, unknown>;
+                    const customId = obj.custom_id;
+
+                    if (typeof customId === "string") {
+                        const value = obj.value;
+                        const values = obj.values;
+
+                        if (typeof value === "string") {
+                            fields[customId] = value;
+                        } else if (Array.isArray(values)) {
+                            fields[customId] =
+                                (values[0] as string | undefined) ?? "";
+                        }
+                    }
+
+                    // Recurse into common nesting keys used by Discord payloads
+                    if (obj.components) {
+                        collectFields(obj.components);
+                    }
+                    if (obj.component) {
+                        collectFields(obj.component);
+                    }
+                };
+
+                collectFields(components);
+
+                const time = fields.time;
+                const message = fields.message;
+                const parseBool = (
+                    value: string | undefined,
+                    defaultValue: boolean
+                ) => {
+                    if (!value) {
+                        return defaultValue;
+                    }
+                    const v = value.trim().toLowerCase();
+                    if (["1", "true", "t", "yes", "y", "on"].includes(v)) {
+                        return true;
+                    }
+                    if (["0", "false", "f", "no", "n", "off"].includes(v)) {
+                        return false;
+                    }
+                    return defaultValue;
+                };
+
+                const publishToChannel = parseBool(fields.publish, false);
+                const ephemeral = publishToChannel
+                    ? false
+                    : parseBool(fields.ephemeral, true);
+
+                // Import and handle the reminder
+                const { handleModalReminder } =
+                    await import("@/commands/reminder/remind-modal");
+
+                const userId =
+                    interaction.user?.id ?? interaction.member?.user?.id ?? "";
+
+                const { data, error } = await tryCatch(
+                    handleModalReminder({
+                        time: time ?? "",
+                        message: message ?? "",
+                        ephemeral,
+                        publishToChannel,
+                        userId,
+                        channelId: interaction.channel_id,
+                        sentAt: Date.now(),
+                        environment:
+                            env.NODE_ENV === "production"
+                                ? "production"
+                                : "development",
+                    })
+                );
+
+                if (error) {
+                    console.error("❌ Error handling modal submission:", error);
+                    return NextResponse.json({
+                        type: InteractionResponseType.ChannelMessageWithSource,
+                        data: {
+                            content: `❌ ${error instanceof Error ? error.message : "Failed to set reminder. Please try again."}`,
+                            flags: 64,
+                        },
+                    });
+                }
+
+                return NextResponse.json({
+                    type: InteractionResponseType.ChannelMessageWithSource,
+                    data: {
+                        content: data.content,
+                        flags: data.ephemeral ? 64 : undefined,
+                    },
+                });
+            }
+
+            return NextResponse.json({
+                type: InteractionResponseType.ChannelMessageWithSource,
+                data: {
+                    content: "Unknown modal submission",
+                    flags: 64,
                 },
             });
         }
