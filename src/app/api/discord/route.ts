@@ -184,21 +184,7 @@ export async function POST(request: NextRequest) {
                             componentInteraction.member?.user?.id ??
                             "";
 
-                        let durationMs: number | null;
-
-                        if (preset === "custom") {
-                            // TODO: Handle custom time input via modal
-                            return NextResponse.json({
-                                type: InteractionResponseType.ChannelMessageWithSource,
-                                data: {
-                                    content:
-                                        "❌ Custom time entry is not yet implemented. Please use a preset time.",
-                                    flags: MessageFlags.Ephemeral,
-                                },
-                            });
-                        } else {
-                            durationMs = parsePresetTime(preset);
-                        }
+                        const durationMs = parsePresetTime(preset);
 
                         if (!durationMs) {
                             return NextResponse.json({
@@ -210,12 +196,23 @@ export async function POST(request: NextRequest) {
                             });
                         }
 
-                        // Try to get cached message content first
+                        // Get cached message content and guild ID
                         const { redis } = await import("@/lib/redis");
                         const cacheKey = `msg_cache:${messageId}`;
-                        let messageContent = await redis.get<string>(cacheKey);
+                        const messageContent =
+                            await redis.get<string>(cacheKey);
 
-                        // Get cached guild ID if available
+                        if (!messageContent) {
+                            return NextResponse.json({
+                                type: InteractionResponseType.ChannelMessageWithSource,
+                                data: {
+                                    content:
+                                        "❌ This reminder has expired. Please try creating a new reminder.",
+                                    flags: MessageFlags.Ephemeral,
+                                },
+                            });
+                        }
+
                         const cachedGuildId = await redis.get<string>(
                             `msg_guild:${messageId}`
                         );
@@ -223,33 +220,6 @@ export async function POST(request: NextRequest) {
                             componentInteraction.guild_id ??
                             cachedGuildId ??
                             undefined;
-
-                        // If not cached, try to fetch from Discord API
-                        if (!messageContent) {
-                            const { REST, Routes } = await import("discord.js");
-                            const token =
-                                env.NODE_ENV === "production"
-                                    ? env.DISCORD_TOKEN
-                                    : env.DISCORD_TOKEN_DEV;
-                            const rest = new REST({ version: "10" }).setToken(
-                                token
-                            );
-
-                            try {
-                                const message = (await rest.get(
-                                    Routes.channelMessage(channelId, messageId)
-                                )) as { content?: string };
-                                messageContent =
-                                    message.content ?? "[No content]";
-                            } catch (error) {
-                                console.error(
-                                    "Failed to fetch message content:",
-                                    error
-                                );
-                                messageContent =
-                                    "[Unable to fetch message content]";
-                            }
-                        }
 
                         const messageLink = createMessageLink(
                             messageId,
