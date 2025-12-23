@@ -85,10 +85,20 @@ export async function execute(
         buttons
     );
 
+    // Create custom time input button
+    const customButton = new ButtonBuilder()
+        .setCustomId(`remind_custom:${messageId}:${channelId}`)
+        .setLabel("Custom Time...")
+        .setStyle(ButtonStyle.Secondary);
+
+    const customRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+        customButton
+    );
+
     return {
         content: "⏰ When would you like to be reminded about this message?",
         ephemeral: true,
-        components: [actionRow],
+        components: [actionRow, customRow],
     };
 }
 

@@ -171,6 +171,42 @@ export async function POST(request: NextRequest) {
                     if (presetPart && messageId && channelId) {
                         const preset = presetPart.replace("remind_", "");
 
+                        // Handle custom time with modal
+                        if (preset === "custom") {
+                            const {
+                                ModalBuilder,
+                                TextInputBuilder,
+                                TextInputStyle,
+                                LabelBuilder,
+                            } = await import("discord.js");
+
+                            const modal = new ModalBuilder()
+                                .setCustomId(
+                                    `remind_custom_modal:${messageId}:${channelId}`
+                                )
+                                .setTitle("Custom Reminder Time");
+
+                            const timeInput = new TextInputBuilder()
+                                .setCustomId("time")
+                                .setStyle(TextInputStyle.Short)
+                                .setPlaceholder(
+                                    "e.g., 5 minutes, 2 hours, tomorrow at 3pm"
+                                )
+                                .setRequired(true)
+                                .setMaxLength(100);
+
+                            const timeLabel = new LabelBuilder()
+                                .setLabel("When?")
+                                .setTextInputComponent(timeInput);
+
+                            modal.addLabelComponents(timeLabel);
+
+                            return NextResponse.json({
+                                type: InteractionResponseType.Modal,
+                                data: modal.toJSON(),
+                            });
+                        }
+
                         const {
                             parsePresetTime,
                             handleReminderCreation,
@@ -323,6 +359,126 @@ export async function POST(request: NextRequest) {
                         flags: data.ephemeral
                             ? MessageFlags.Ephemeral
                             : undefined,
+                    },
+                });
+            } else if (
+                interaction.data.custom_id.startsWith("remind_custom_modal:")
+            ) {
+                // Handle custom time modal for message context menu
+                const parts = interaction.data.custom_id.split(":");
+                const messageId = parts[1];
+                const channelId = parts[2];
+
+                if (!messageId || !channelId) {
+                    return NextResponse.json({
+                        type: InteractionResponseType.ChannelMessageWithSource,
+                        data: {
+                            content: "❌ Invalid modal submission",
+                            flags: MessageFlags.Ephemeral,
+                        },
+                    });
+                }
+
+                const fields = collectModalFields(interaction);
+                const time = fields.time;
+
+                if (!time) {
+                    return NextResponse.json({
+                        type: InteractionResponseType.ChannelMessageWithSource,
+                        data: {
+                            content: "❌ Please provide a time",
+                            flags: MessageFlags.Ephemeral,
+                        },
+                    });
+                }
+
+                const { parseSimpleDuration } =
+                    await import("@/lib/time-utils");
+                const durationMs = parseSimpleDuration(time) ?? 0;
+
+                if (durationMs === 0) {
+                    return NextResponse.json({
+                        type: InteractionResponseType.ChannelMessageWithSource,
+                        data: {
+                            content: `❌ Could not parse time "${time}". Please use formats like "5 minutes", "2 hours", "tomorrow at 3pm", or "next Friday at noon".`,
+                            flags: MessageFlags.Ephemeral,
+                        },
+                    });
+                }
+
+                // Get cached message content and guild ID
+                const { redis } = await import("@/lib/redis");
+                const cacheKey = `msg_cache:${messageId}`;
+                const messageContent = await redis.get<string>(cacheKey);
+
+                if (!messageContent) {
+                    return NextResponse.json({
+                        type: InteractionResponseType.ChannelMessageWithSource,
+                        data: {
+                            content:
+                                "❌ This reminder has expired. Please try creating a new reminder.",
+                            flags: MessageFlags.Ephemeral,
+                        },
+                    });
+                }
+
+                const cachedGuildId = await redis.get<string>(
+                    `msg_guild:${messageId}`
+                );
+                const guildId =
+                    interaction.guild_id ?? cachedGuildId ?? undefined;
+
+                const {
+                    handleReminderCreation,
+                    createMessageLink,
+                    createMessagePreview,
+                } = await import("@/commands/create-reminder/context-menu");
+
+                const messageLink = createMessageLink(
+                    messageId,
+                    channelId,
+                    guildId
+                );
+
+                const messagePreview = createMessagePreview(messageContent);
+
+                const userId =
+                    interaction.user?.id ?? interaction.member?.user?.id ?? "";
+
+                const { data, error } = await tryCatch(
+                    handleReminderCreation({
+                        durationMs,
+                        userId,
+                        messageContent,
+                        messageLink,
+                        messagePreview,
+                        sentAt: Date.now(),
+                        environment:
+                            env.NODE_ENV === "production"
+                                ? "production"
+                                : "development",
+                    })
+                );
+
+                if (error) {
+                    console.error(
+                        "❌ Error handling custom time modal:",
+                        error
+                    );
+                    return NextResponse.json({
+                        type: InteractionResponseType.ChannelMessageWithSource,
+                        data: {
+                            content: `❌ ${error instanceof Error ? error.message : "Failed to set reminder."}`,
+                            flags: MessageFlags.Ephemeral,
+                        },
+                    });
+                }
+
+                return NextResponse.json({
+                    type: InteractionResponseType.ChannelMessageWithSource,
+                    data: {
+                        content: data.content,
+                        flags: MessageFlags.Ephemeral,
                     },
                 });
             }
