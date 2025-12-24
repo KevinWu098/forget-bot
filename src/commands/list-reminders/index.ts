@@ -1,6 +1,7 @@
 import { formatDistanceToNow } from "date-fns";
 import {
     ApplicationIntegrationType,
+    EmbedBuilder,
     InteractionContextType,
     SlashCommandBuilder,
 } from "discord.js";
@@ -55,9 +56,12 @@ export async function execute(
     }
 
     const activeReminders: Array<{
+        runId: string;
         message: string;
         scheduledFor: number;
         timeRemaining: string;
+        messageLink?: string;
+        messagePreview?: string;
     }> = [];
 
     await Promise.all(
@@ -86,10 +90,17 @@ export async function execute(
                 });
 
                 activeReminders.push({
+                    runId,
                     message:
                         String(reminderData["message"]) ?? "Message not found",
                     scheduledFor,
                     timeRemaining,
+                    messageLink: reminderData.messageLink
+                        ? String(reminderData.messageLink)
+                        : undefined,
+                    messagePreview: reminderData.messagePreview
+                        ? String(reminderData.messagePreview)
+                        : undefined,
                 });
             }
         })
@@ -104,14 +115,56 @@ export async function execute(
 
     activeReminders.sort((a, b) => a.scheduledFor - b.scheduledFor);
 
-    const reminderList = activeReminders
-        .map((reminder, index) => {
-            return `${index + 1}. **"${reminder.message}"** - in ${reminder.timeRemaining}`;
-        })
-        .join("\n");
+    // Create separate embeds for each reminder (max 10)
+    const embeds: EmbedBuilder[] = [];
+
+    // Add header content
+    const headerContent =
+        activeReminders.length > 10
+            ? `📋 **Your Active Reminders** (showing 10 of ${activeReminders.length})`
+            : `📋 **Your Active Reminders** (${activeReminders.length} total)`;
+
+    for (let i = 0; i < Math.min(activeReminders.length, 10); i++) {
+        const reminder = activeReminders[i];
+        if (!reminder) {
+            continue;
+        }
+
+        // Format the message display
+        const messageDisplay =
+            reminder.messagePreview ??
+            (reminder.message.length > 200
+                ? reminder.message.substring(0, 200) + "..."
+                : reminder.message);
+
+        const embed = new EmbedBuilder()
+            .setColor(0x5865f2) // Discord blurple
+            .setDescription(messageDisplay)
+            .addFields(
+                {
+                    name: "⏳ Time Remaining",
+                    value: `In **${reminder.timeRemaining}**`,
+                    inline: true,
+                },
+                {
+                    name: "📅 Scheduled For",
+                    value: `<t:${Math.floor(reminder.scheduledFor / 1000)}:F>`,
+                    inline: true,
+                }
+            );
+
+        // Make the embed clickable if there's a message link
+        if (reminder.messageLink) {
+            embed.setURL(reminder.messageLink);
+            embed.setTitle("Jump to Message 🔗");
+        }
+
+        embeds.push(embed);
+    }
 
     return {
-        content: `📋 **Your Active Reminders:**\n\n${reminderList}`,
+        content: headerContent,
         ephemeral: true,
+        embeds,
     };
 }

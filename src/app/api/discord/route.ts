@@ -92,15 +92,35 @@ export async function POST(request: NextRequest) {
                     });
                 }
 
+                const responseData: {
+                    content: string;
+                    flags?: number;
+                    components?: unknown[];
+                    embeds?: unknown[];
+                } = {
+                    content: data.content,
+                    flags: data.ephemeral ? MessageFlags.Ephemeral : undefined,
+                };
+
+                // Add containers or components
+                if (data.containers && data.containers.length > 0) {
+                    responseData.components = data.containers.map((c) =>
+                        c.toJSON()
+                    );
+                    responseData.flags = (responseData.flags ?? 0) | (1 << 7); // MessageFlags.IsComponentsV2
+                } else if (data.components) {
+                    responseData.components = data.components.map((c) =>
+                        c.toJSON()
+                    );
+                }
+
+                if (data.embeds) {
+                    responseData.embeds = data.embeds.map((e) => e.toJSON());
+                }
+
                 return NextResponse.json({
                     type: InteractionResponseType.ChannelMessageWithSource,
-                    data: {
-                        content: data.content,
-                        flags: data.ephemeral
-                            ? MessageFlags.Ephemeral
-                            : undefined,
-                        components: data.components?.map((c) => c.toJSON()),
-                    },
+                    data: responseData,
                 });
             } else if (isMessageContextMenuCommand(interaction)) {
                 const messageInteraction =
@@ -127,15 +147,35 @@ export async function POST(request: NextRequest) {
                     });
                 }
 
+                const responseData: {
+                    content: string;
+                    flags?: number;
+                    components?: unknown[];
+                    embeds?: unknown[];
+                } = {
+                    content: data.content,
+                    flags: data.ephemeral ? MessageFlags.Ephemeral : undefined,
+                };
+
+                // Add containers or components
+                if (data.containers && data.containers.length > 0) {
+                    responseData.components = data.containers.map((c) =>
+                        c.toJSON()
+                    );
+                    responseData.flags = (responseData.flags ?? 0) | (1 << 7); // MessageFlags.IsComponentsV2
+                } else if (data.components) {
+                    responseData.components = data.components.map((c) =>
+                        c.toJSON()
+                    );
+                }
+
+                if (data.embeds) {
+                    responseData.embeds = data.embeds.map((e) => e.toJSON());
+                }
+
                 return NextResponse.json({
                     type: InteractionResponseType.ChannelMessageWithSource,
-                    data: {
-                        content: data.content,
-                        flags: data.ephemeral
-                            ? MessageFlags.Ephemeral
-                            : undefined,
-                        components: data.components?.map((c) => c.toJSON()),
-                    },
+                    data: responseData,
                 });
             }
 

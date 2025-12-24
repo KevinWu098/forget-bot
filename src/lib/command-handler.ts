@@ -1,6 +1,12 @@
 import { commands } from "@/commands";
 import type { NodeEnv } from "@/env";
-import type { ActionRowBuilder, ButtonBuilder, ModalBuilder } from "discord.js";
+import type {
+    ActionRowBuilder,
+    ButtonBuilder,
+    ContainerBuilder,
+    EmbedBuilder,
+    ModalBuilder,
+} from "discord.js";
 
 import { WHITELIST } from "@/lib/constants";
 import { tryCatch } from "@/lib/try-catch";
@@ -15,6 +21,8 @@ export type CommandResponse = {
     ephemeral?: boolean;
     modal?: ModalBuilder;
     components?: ActionRowBuilder<ButtonBuilder>[];
+    embeds?: EmbedBuilder[];
+    containers?: ContainerBuilder[];
 };
 
 export async function handleCommand(
@@ -60,6 +68,8 @@ export async function handleCommand(
         ephemeral: data.ephemeral,
         modal: data.modal,
         components: data.components,
+        embeds: data.embeds,
+        containers: data.containers,
     };
 }
 
