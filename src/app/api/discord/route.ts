@@ -278,12 +278,12 @@ export async function POST(request: NextRequest) {
                         const messageContent =
                             await redis.get<string>(cacheKey);
 
-                        if (!messageContent) {
+                        if (messageContent === null) {
                             return NextResponse.json({
                                 type: InteractionResponseType.ChannelMessageWithSource,
                                 data: {
                                     content:
-                                        "❌ This reminder has expired. Please try creating a new reminder.",
+                                        "❌ This reminder request has timed out. Please right-click the message again to create a new reminder.",
                                     flags: MessageFlags.Ephemeral,
                                 },
                             });
@@ -451,12 +451,12 @@ export async function POST(request: NextRequest) {
                 const cacheKey = `msg_cache:${messageId}`;
                 const messageContent = await redis.get<string>(cacheKey);
 
-                if (!messageContent) {
+                if (messageContent === null) {
                     return NextResponse.json({
                         type: InteractionResponseType.ChannelMessageWithSource,
                         data: {
                             content:
-                                "❌ This reminder has expired. Please try creating a new reminder.",
+                                "❌ This reminder request has timed out. Please right-click the message again to create a new reminder.",
                             flags: MessageFlags.Ephemeral,
                         },
                     });
