@@ -340,11 +340,12 @@ export function parseSimpleDuration(
     }
 
     // Fall back to chrono for more complex expressions
-    // Note: chrono will parse in system timezone, but for expressions like
-    // "in 5 minutes" or "next Friday" the timezone doesn't matter much
-    const parsedDate = chrono.parseDate(trimmed, new Date(nowMs), {
-        forwardDate: true,
-    });
+    // Configure chrono to interpret times in LA timezone
+    const parsedDate = chrono.parseDate(
+        trimmed,
+        { instant: new Date(nowMs), timezone: LA_TZ },
+        { forwardDate: true }
+    );
 
     if (!parsedDate) {
         return null;
