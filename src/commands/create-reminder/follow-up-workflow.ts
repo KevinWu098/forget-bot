@@ -85,8 +85,10 @@ async function checkUserReaction(
 
     try {
         // Get users who reacted with the checkmark emoji
+        // The emoji must be URL-encoded for the Discord API
+        const encodedEmoji = encodeURIComponent("✅");
         const reactions = (await rest.get(
-            Routes.channelMessageReaction(channelId, messageId, "✅")
+            Routes.channelMessageReaction(channelId, messageId, encodedEmoji)
         )) as Array<{ id: string }>;
 
         // Check if the target user is in the list of people who reacted
