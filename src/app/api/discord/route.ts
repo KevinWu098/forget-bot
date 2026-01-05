@@ -399,12 +399,24 @@ export async function POST(request: NextRequest) {
                             });
                         }
 
+                        const responseData: {
+                            content: string;
+                            flags: number;
+                            components?: unknown[];
+                        } = {
+                            content: data.content,
+                            flags: MessageFlags.Ephemeral,
+                        };
+
+                        if (data.components) {
+                            responseData.components = data.components.map((c) =>
+                                c.toJSON()
+                            );
+                        }
+
                         return NextResponse.json({
                             type: InteractionResponseType.ChannelMessageWithSource,
-                            data: {
-                                content: data.content,
-                                flags: MessageFlags.Ephemeral,
-                            },
+                            data: responseData,
                         });
                     }
                 }
@@ -578,12 +590,24 @@ export async function POST(request: NextRequest) {
                     });
                 }
 
+                const responseData: {
+                    content: string;
+                    flags: number;
+                    components?: unknown[];
+                } = {
+                    content: data.content,
+                    flags: MessageFlags.Ephemeral,
+                };
+
+                if (data.components) {
+                    responseData.components = data.components.map((c) =>
+                        c.toJSON()
+                    );
+                }
+
                 return NextResponse.json({
                     type: InteractionResponseType.ChannelMessageWithSource,
-                    data: {
-                        content: data.content,
-                        flags: MessageFlags.Ephemeral,
-                    },
+                    data: responseData,
                 });
             }
 
