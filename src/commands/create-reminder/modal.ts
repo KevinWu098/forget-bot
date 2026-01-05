@@ -1,6 +1,9 @@
 import type { NodeEnv } from "@/env";
 import {
+    ActionRowBuilder,
     ApplicationIntegrationType,
+    ButtonBuilder,
+    ButtonStyle,
     InteractionContextType,
     LabelBuilder,
     ModalBuilder,
@@ -146,9 +149,19 @@ export async function handleModalReminder(params: {
 
         const relativeTime = formatRelativeLA(scheduledForMs, sentAt);
 
+        const cancelButton = new ButtonBuilder()
+            .setCustomId(`cancel_reminder:${runId}:${userId}`)
+            .setLabel("Cancel Reminder")
+            .setStyle(ButtonStyle.Danger);
+
+        const actionRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+            cancelButton
+        );
+
         return {
             content: `✅ Reminder set! I'll remind you about "${message}" ${relativeTime}`,
             ephemeral,
+            components: [actionRow],
         };
     } catch (error) {
         console.error("Error setting reminder:", error);
@@ -158,4 +171,3 @@ export async function handleModalReminder(params: {
         };
     }
 }
-

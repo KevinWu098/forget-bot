@@ -1,6 +1,8 @@
 import type { NodeEnv } from "@/env";
 import { sleep } from "workflow";
 
+import { followUpWorkflow } from "./follow-up-workflow";
+
 export async function remindWorkflow(
     durationMs: number,
     scheduledForMs: number,
@@ -21,11 +23,22 @@ export async function remindWorkflow(
 
     await sleep(durationMs);
 
-    await sendDiscordMessage(
+    const { sentMessageId, channelId } = await sendDiscordMessage(
         userId,
         message,
         environment,
         scheduledForMs,
+        messageLink,
+        messagePreview
+    );
+
+    // Start follow-up workflow to handle escalating reminders
+    await startFollowUpWorkflow(
+        sentMessageId,
+        channelId,
+        userId,
+        message,
+        environment,
         messageLink,
         messagePreview
     );
@@ -36,6 +49,30 @@ export async function remindWorkflow(
     };
 }
 
+async function startFollowUpWorkflow(
+    messageId: string,
+    channelId: string,
+    userId: string,
+    message: string,
+    environment: NodeEnv,
+    messageLink?: string,
+    messagePreview?: string
+) {
+    "use step";
+
+    const { start } = await import("workflow/api");
+
+    await start(followUpWorkflow, [
+        messageId,
+        channelId,
+        userId,
+        message,
+        environment,
+        messageLink,
+        messagePreview,
+    ]);
+}
+
 async function sendDiscordMessage(
     userId: string,
     message: string,
@@ -43,7 +80,7 @@ async function sendDiscordMessage(
     scheduledFor: number,
     messageLink?: string,
     messagePreview?: string
-) {
+): Promise<{ sentMessageId: string; channelId: string }> {
     "use step";
 
     const { REST, Routes } = await import("discord.js");
@@ -72,9 +109,17 @@ async function sendDiscordMessage(
             body: { recipient_id: userId },
         })) as { id: string };
 
-        await rest.post(Routes.channelMessages(dmChannel.id), {
-            body: { content },
-        });
+        const sentMessage = (await rest.post(
+            Routes.channelMessages(dmChannel.id),
+            {
+                body: { content },
+            }
+        )) as { id: string };
+
+        // React with checkmark emoji to the sent message
+        await rest.put(
+            Routes.channelMessageOwnReaction(dmChannel.id, sentMessage.id, "✅")
+        );
 
         console.info(
             `✅ [${environment.toUpperCase()}] Reminder sent to user ${userId}: ${message}`
@@ -97,9 +142,10 @@ async function sendDiscordMessage(
                 break;
             }
         }
+
+        return { sentMessageId: sentMessage.id, channelId: dmChannel.id };
     } catch (error) {
         console.error(`❌ Failed to send reminder to user ${userId}:`, error);
         throw error;
     }
 }
-

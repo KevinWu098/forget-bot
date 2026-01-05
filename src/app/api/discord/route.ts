@@ -202,6 +202,70 @@ export async function POST(request: NextRequest) {
             ) {
                 const customId = componentInteraction.data.custom_id;
 
+                // Handle cancel reminder button
+                if (customId.startsWith("cancel_reminder:")) {
+                    const parts = customId.split(":");
+                    const runId = parts[1];
+                    const expectedUserId = parts[2];
+
+                    const userId =
+                        componentInteraction.user?.id ??
+                        componentInteraction.member?.user?.id ??
+                        "";
+
+                    // Verify the user clicking is the one who created the reminder
+                    if (userId !== expectedUserId) {
+                        return NextResponse.json({
+                            type: InteractionResponseType.ChannelMessageWithSource,
+                            data: {
+                                content:
+                                    "❌ You can only cancel your own reminders.",
+                                flags: MessageFlags.Ephemeral,
+                            },
+                        });
+                    }
+
+                    if (!runId) {
+                        return NextResponse.json({
+                            type: InteractionResponseType.ChannelMessageWithSource,
+                            data: {
+                                content: "❌ Invalid reminder ID.",
+                                flags: MessageFlags.Ephemeral,
+                            },
+                        });
+                    }
+
+                    const { getRun } = await import("workflow/api");
+                    const { redis } = await import("@/lib/redis");
+
+                    const run = getRun(runId);
+                    const { error } = await tryCatch(run.cancel());
+
+                    if (error) {
+                        console.error("❌ Error cancelling reminder:", error);
+                        return NextResponse.json({
+                            type: InteractionResponseType.ChannelMessageWithSource,
+                            data: {
+                                content:
+                                    "❌ Failed to cancel reminder. It may have already been sent or cancelled.",
+                                flags: MessageFlags.Ephemeral,
+                            },
+                        });
+                    }
+
+                    // Clean up Redis entries
+                    await redis.srem(`user:${userId}:reminders`, runId);
+                    await redis.del(`reminder:${runId}`);
+
+                    return NextResponse.json({
+                        type: InteractionResponseType.ChannelMessageWithSource,
+                        data: {
+                            content: "✅ Reminder cancelled successfully.",
+                            flags: MessageFlags.Ephemeral,
+                        },
+                    });
+                }
+
                 if (customId.startsWith("remind_")) {
                     const parts = customId.split(":");
                     const presetPart = parts[0];

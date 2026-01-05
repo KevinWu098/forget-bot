@@ -1,5 +1,8 @@
 import {
+    ActionRowBuilder,
     ApplicationIntegrationType,
+    ButtonBuilder,
+    ButtonStyle,
     InteractionContextType,
     SlashCommandBuilder,
 } from "discord.js";
@@ -95,9 +98,19 @@ export async function execute(
 
         const relativeTime = formatRelativeLA(scheduledForMs, sentAt);
 
+        const cancelButton = new ButtonBuilder()
+            .setCustomId(`cancel_reminder:${runId}:${userId}`)
+            .setLabel("Cancel Reminder")
+            .setStyle(ButtonStyle.Danger);
+
+        const actionRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+            cancelButton
+        );
+
         return {
             content: `✅ Reminder set! I'll remind you about "${message}" ${relativeTime}`,
             ephemeral,
+            components: [actionRow],
         };
     } catch (error) {
         console.error("Error setting reminder:", error);
@@ -107,4 +120,3 @@ export async function execute(
         };
     }
 }
-
